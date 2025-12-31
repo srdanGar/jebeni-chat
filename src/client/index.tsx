@@ -1,6 +1,6 @@
 import { createRoot } from "react-dom/client";
 import { usePartySocket } from "partysocket/react";
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   BrowserRouter,
   Routes,
@@ -92,96 +92,103 @@ function App() {
     },
   });
 
+  const messagesEndRef = useRef<HTMLDivElement>(null); // Add ref for scrolling to bottom
+
+  // Add useEffect to auto-scroll to bottom on new messages
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
   return (
-    <div className="chat container">
-      <div className="row nickname-row">
-        <div className="two columns user">
-          <strong>{name}</strong>
-        </div>
-        <div className="ten columns">
-          {editingName ? (
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                const newName = tempName.trim();
-                if (newName.length > 0) setName(newName);
-                setEditingName(false);
-              }}
-            >
-              <input
-                value={tempName}
-                onChange={(e) => setTempName(e.currentTarget.value)}
-                className="my-input-text"
-                autoComplete="off"
-              />
-              <button type="submit">Save</button>
-              <button
-                type="button"
-                onClick={() => {
-                  setEditingName(false);
-                  setTempName(name);
-                }}
-              >
-                Cancel
-              </button>
-            </form>
-          ) : (
-            <button
-              onClick={() => {
-                setTempName(name);
-                setEditingName(true);
-              }}
-            >
-              Edit Nickname
-            </button>
-          )}
-        </div>
+    <>
+      <div className="chat">
+        {messages.map((message) => (
+          <div key={message.id} className="row message">
+            <div className="two columns user">{message.user}</div>
+            <div className="ten columns">{message.content}</div>
+          </div>
+        ))}
+        <form
+          className="row"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const content = e.currentTarget.elements.namedItem(
+              "content"
+            ) as HTMLInputElement;
+            const chatMessage: ChatMessage = {
+              id: nanoid(8),
+              content: content.value,
+              user: name,
+              role: "user",
+            };
+            setMessages((messages) => [...messages, chatMessage]);
+            // we could broadcast the message here
+
+            socket.send(
+              JSON.stringify({
+                type: "add",
+                ...chatMessage,
+              } satisfies Message)
+            );
+
+            content.value = "";
+          }}
+        >
+          <input
+            type="text"
+            name="content"
+            className="ten columns my-input-text"
+            placeholder={`Hello ${name}! Type a message...`}
+            autoComplete="off"
+          />
+          <button type="submit" className="send-message two columns">
+            Send
+          </button>
+        </form>
+
+        {/* Add invisible element at the end for scrolling reference */}
+        <div ref={messagesEndRef} />
       </div>
-
-      {messages.map((message) => (
-        <div key={message.id} className="row message">
-          <div className="two columns user">{message.user}</div>
-          <div className="ten columns">{message.content}</div>
-        </div>
-      ))}
-      <form
-        className="row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          const content = e.currentTarget.elements.namedItem(
-            "content"
-          ) as HTMLInputElement;
-          const chatMessage: ChatMessage = {
-            id: nanoid(8),
-            content: content.value,
-            user: name,
-            role: "user",
-          };
-          setMessages((messages) => [...messages, chatMessage]);
-          // we could broadcast the message here
-
-          socket.send(
-            JSON.stringify({
-              type: "add",
-              ...chatMessage,
-            } satisfies Message)
-          );
-
-          content.value = "";
-        }}
-      >
-        <input
-          type="text"
-          name="content"
-          className="ten columns my-input-text"
-          placeholder={`Hello ${name}! Type a message...`}
-          autoComplete="off"
-        />
-        <button type="submit" className="send-message two columns">
-          Send
-        </button>
-      </form>
-    </div>
+      {/* Add the nickname edit UI here, positioned left via CSS */}
+      <div className="nickname-edit">
+        {editingName ? (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              const newName = tempName.trim();
+              if (newName.length > 0) setName(newName);
+              setEditingName(false);
+            }}
+          >
+            <input
+              value={tempName}
+              onChange={(e) => setTempName(e.currentTarget.value)}
+              className="my-input-text"
+              autoComplete="off"
+            />
+            <button type="submit">Save</button>
+            <button
+              type="button"
+              onClick={() => {
+                setEditingName(false);
+                setTempName(name);
+              }}
+            >
+              Cancel
+            </button>
+          </form>
+        ) : (
+          <button
+            onClick={() => {
+              setTempName(name);
+              setEditingName(true);
+            }}
+          >
+            Edit Nickname
+          </button>
+        )}
+      </div>
+    </>
   );
 }
 
