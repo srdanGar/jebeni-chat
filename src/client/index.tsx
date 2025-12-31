@@ -102,12 +102,18 @@ function App() {
   return (
     <>
       <div className="chat">
-        {messages.map((message) => (
-          <div key={message.id} className="row message">
-            <div className="two columns user">{message.user}</div>
-            <div className="ten columns">{message.content}</div>
-          </div>
-        ))}
+        {/* Wrap messages in separate scrollable container */}
+        <div className="messages">
+          {messages.map((message) => (
+            <div key={message.id} className="row message">
+              <div className="two columns user">{message.user}</div>
+              <div className="ten columns">{message.content}</div>
+            </div>
+          ))}
+          {/* Add invisible element at the end for scrolling reference */}
+          <div ref={messagesEndRef} />
+        </div>
+
         <form
           className="row"
           onSubmit={(e) => {
@@ -145,9 +151,6 @@ function App() {
             Send
           </button>
         </form>
-
-        {/* Add invisible element at the end for scrolling reference */}
-        <div ref={messagesEndRef} />
       </div>
       {/* Add the nickname edit UI here, positioned left via CSS */}
       <div className="nickname-edit">

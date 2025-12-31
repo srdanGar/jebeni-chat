@@ -8,8 +8,11 @@ html {
 }
 
 .chat {
+  display: flex;
+  flex-direction: column;
+  height: 100vh; /* Full viewport height */
   padding-top: 40px;
-  overflow: scroll;
+}
 
 /* Add styles for the nickname edit UI to position it on the left side */
 .nickname-edit {
@@ -29,14 +32,19 @@ html {
   margin-left: 5px;
 }
 
+/* New: Separate scrollable container for messages */
+.messages {
+  flex: 1; /* Grow to fill available space */
+  overflow-y: auto; /* Scrollable only for messages */
+  padding: 10px;
+}
+
 #root {
   flex: 1;
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
-  overflow-y: auto;
+  /* Removed overflow-y: auto and justify-content: flex-end to avoid scrolling the whole thing */
   height: 100%;
-  /* padding: 10px; */
 }
 
 .message {
