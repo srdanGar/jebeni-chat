@@ -5,6 +5,11 @@ html {
   padding: 0;
   display: flex;
   flex-direction: column;
+  background: linear-gradient(
+    135deg,
+    #000000 0%,
+    #1a1a1a 100%
+  ); /* Dark gradient background */
 }
 
 .chat {
@@ -21,6 +26,7 @@ html {
   margin-bottom: 10px;
   justify-content: flex-start; /* Align to the left */
   padding-left: 10px; /* Add some left padding for spacing */
+  position: relative; /* For absolute positioning of color picker */
 }
 
 .nickname-edit span {
@@ -49,6 +55,10 @@ html {
 
 .message {
   margin-bottom: 10px;
+  background-color: #3e2723; /* Dark brown background for messages */
+  padding: 5px;
+  border-radius: 5px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
 }
 
 .message .user {
@@ -74,4 +84,29 @@ html {
 
 .my-input-text::placeholder {
   color: #ccc;
+}
+
+/* Color picker popup styles */
+.color-picker {
+  position: absolute;
+  background-color: #333;
+  border: 1px solid #555;
+  padding: 10px;
+  border-radius: 5px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  max-width: 200px;
+}
+
+.color-swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid #555;
+}
+
+.color-swatch:hover {
+  border-color: #fff;
 }

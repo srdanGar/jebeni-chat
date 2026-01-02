@@ -4,6 +4,7 @@ export type ChatMessage = {
   user: string;
   role: "user" | "assistant";
   timestamp: string;
+  color?: string;
 };
 
 export type Message =
@@ -14,6 +15,7 @@ export type Message =
       user: string;
       role: "user" | "assistant";
       timestamp: string;
+      color?: string;
     }
   | {
       type: "update";
@@ -22,6 +24,7 @@ export type Message =
       user: string;
       role: "user" | "assistant";
       timestamp: string;
+      color?: string;
     }
   | {
       type: "all";

@@ -18,6 +18,14 @@ function App() {
 
   const storageKey = `chat:name${room ? ":" + room : ""}`;
 
+  const getTextShadow = (color: string) => {
+    const r = parseInt(color.slice(1, 3), 16);
+    const g = parseInt(color.slice(3, 5), 16);
+    const b = parseInt(color.slice(5, 7), 16);
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    return luminance < 0.5 ? "1px 1px 2px rgba(128, 128, 128, 0.7)" : "none";
+  };
+
   const [name, setName] = useState(() => {
     try {
       const stored = localStorage.getItem(storageKey);
@@ -28,8 +36,44 @@ function App() {
     return names[Math.floor(Math.random() * names.length)];
   });
 
+  const colorStorageKey = `chat:color${room ? ":" + room : ""}`;
+
+  const [selectedColor, setSelectedColor] = useState(() => {
+    try {
+      const stored = localStorage.getItem(colorStorageKey);
+      if (stored) return stored;
+    } catch (e) {
+      // localStorage may be unavailable; fall back to default
+    }
+    return "#ffffff"; // default white
+  });
+
   const [editingName, setEditingName] = useState(false);
   const [tempName, setTempName] = useState(name);
+  const [showColorPicker, setShowColorPicker] = useState(false);
+
+  const colors = [
+    "#ffffff",
+    "#000000",
+    "#ff0000",
+    "#00ff00",
+    "#0000ff",
+    "#ffff00",
+    "#ff00ff",
+    "#00ffff",
+    "#ffa500",
+    "#800080",
+    "#ffc0cb",
+    "#a52a2a",
+    "#808080",
+    "#000080",
+    "#008000",
+    "#ff4500",
+    "#daa520",
+    "#adff2f",
+    "#ff69b4",
+    "#1e90ff",
+  ];
 
   React.useEffect(() => {
     try {
@@ -38,6 +82,14 @@ function App() {
       // ignore
     }
   }, [name, storageKey]);
+
+  React.useEffect(() => {
+    try {
+      localStorage.setItem(colorStorageKey, selectedColor);
+    } catch (e) {
+      // ignore
+    }
+  }, [selectedColor, colorStorageKey]);
 
   const socket = usePartySocket({
     party: "chat",
@@ -56,6 +108,7 @@ function App() {
               user: message.user,
               role: message.role,
               timestamp: message.timestamp,
+              color: message.color,
             },
           ]);
         } else {
@@ -71,6 +124,7 @@ function App() {
                 user: message.user,
                 role: message.role,
                 timestamp: message.timestamp,
+                color: message.color,
               })
               .concat(messages.slice(foundIndex + 1));
           });
@@ -85,6 +139,7 @@ function App() {
                   user: message.user,
                   role: message.role,
                   timestamp: message.timestamp,
+                  color: message.color,
                 }
               : m
           )
@@ -108,10 +163,15 @@ function App() {
         {/* Wrap messages in separate scrollable container */}
         <div className="messages">
           {messages.map((message) => (
-            <div key={message.id} className="row message">
-              <div className="two columns user">{message.user}</div>
-              <div className="ten columns">
-                {message.content}
+            <div key={message.id} className="message">
+              <div
+                className="message-content"
+                style={{
+                  color: message.color || "#ffffff",
+                  textShadow: getTextShadow(message.color || "#ffffff"),
+                }}
+              >
+                <strong>{message.user}:</strong> {message.content}
                 <br />
                 <small>
                   {new Date(message.timestamp).toLocaleDateString()}{" "}
@@ -140,6 +200,7 @@ function App() {
               user: name,
               role: "user",
               timestamp: new Date().toISOString(),
+              color: selectedColor,
             };
             setMessages((messages) => [...messages, chatMessage]);
             // we could broadcast the message here
@@ -195,14 +256,37 @@ function App() {
             </button>
           </form>
         ) : (
-          <button
-            onClick={() => {
-              setTempName(name);
-              setEditingName(true);
-            }}
-          >
-            Edit Nickname
-          </button>
+          <>
+            <button
+              onClick={() => {
+                setTempName(name);
+                setEditingName(true);
+              }}
+            >
+              Edit Nickname
+            </button>
+            <button
+              onClick={() => setShowColorPicker(!showColorPicker)}
+              style={{ backgroundColor: selectedColor, color: "white" }}
+            >
+              Choose Color
+            </button>
+            {showColorPicker && (
+              <div className="color-picker">
+                {colors.map((color) => (
+                  <div
+                    key={color}
+                    className="color-swatch"
+                    style={{ backgroundColor: color }}
+                    onClick={() => {
+                      setSelectedColor(color);
+                      setShowColorPicker(false);
+                    }}
+                  />
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
     </>

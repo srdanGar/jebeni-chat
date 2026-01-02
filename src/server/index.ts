@@ -22,7 +22,7 @@ export class Chat extends Server<Env> {
 
     // create the messages table if it doesn't exist
     this.ctx.storage.sql.exec(
-      `CREATE TABLE IF NOT EXISTS messages (id TEXT PRIMARY KEY, user TEXT, role TEXT, content TEXT, timestamp TEXT)`
+      `CREATE TABLE IF NOT EXISTS messages (id TEXT PRIMARY KEY, user TEXT, role TEXT, content TEXT, timestamp TEXT, color TEXT)`
     );
 
     // add timestamp column if it doesn't exist (for schema evolution)
@@ -34,10 +34,17 @@ export class Chat extends Server<Env> {
       // column might already exist
     }
 
+    // add color column if it doesn't exist
+    try {
+      this.ctx.storage.sql.exec(`ALTER TABLE messages ADD COLUMN color TEXT`);
+    } catch (e) {
+      // column might already exist
+    }
+
     // load the messages from the database
     this.messages = this.ctx.storage.sql
       .exec(
-        `SELECT id, user, role, content, COALESCE(timestamp, '${new Date().toISOString()}') as timestamp FROM messages`
+        `SELECT id, user, role, content, COALESCE(timestamp, '${new Date().toISOString()}') as timestamp, color FROM messages`
       )
       .toArray() as ChatMessage[];
   }
@@ -66,15 +73,15 @@ export class Chat extends Server<Env> {
     }
 
     this.ctx.storage.sql.exec(
-      `INSERT INTO messages (id, user, role, content, timestamp) VALUES ('${
+      `INSERT INTO messages (id, user, role, content, timestamp, color) VALUES ('${
         message.id
       }', '${message.user}', '${message.role}', ${JSON.stringify(
         message.content
-      )}, '${
-        message.timestamp
+      )}, '${message.timestamp}', '${
+        message.color || ""
       }') ON CONFLICT (id) DO UPDATE SET content = ${JSON.stringify(
         message.content
-      )}, timestamp = '${message.timestamp}'`
+      )}, timestamp = '${message.timestamp}', color = '${message.color || ""}'`
     );
   }
 
