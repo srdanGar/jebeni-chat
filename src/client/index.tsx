@@ -1,20 +1,14 @@
 import { createRoot } from "react-dom/client";
 import { usePartySocket } from "partysocket/react";
 import React, { useState, useEffect, useRef } from "react";
-import {
-  BrowserRouter,
-  Routes,
-  Route,
-  Navigate,
-  useParams,
-} from "react-router";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router";
 import { nanoid } from "nanoid";
 
 import { names, type ChatMessage, type Message } from "../shared";
 
 function App() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const { room } = useParams();
+  const room = "9FexDdTqo9kdtdgg0WukK";
 
   const storageKey = `chat:name${room ? ":" + room : ""}`;
 
@@ -308,9 +302,11 @@ function App() {
 createRoot(document.getElementById("root")!).render(
   <BrowserRouter>
     <Routes>
-      <Route path="/" element={<Navigate to={`/${nanoid()}`} />} />
-      <Route path="/:room" element={<App />} />
-      <Route path="*" element={<Navigate to="/" />} />
+      {/*<Route path="/" element={<Navigate to={`/${nanoid()}`} />} />*/}
+      <Route path="/" element={<Navigate to="/9FexDdTqo9kdtdgg0WukK" />} />
+      {/* <Route path="/:room" element={<App />} /> */}
+      <Route path="/9FexDdTqo9kdtdgg0WukK" element={<App />} />
+      <Route path="*" element={<Navigate to="/9FexDdTqo9kdtdgg0WukK" />} />
     </Routes>
   </BrowserRouter>
 );
