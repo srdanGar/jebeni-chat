@@ -26,6 +26,10 @@ function App() {
     return luminance < 0.5 ? "1px 1px 2px rgba(128, 128, 128, 0.7)" : "none";
   };
 
+  const isDarkColor = (color: string) => {
+    return color === "#000000" || color === "#0000ff" || color === "#000080";
+  };
+
   const [name, setName] = useState(() => {
     try {
       const stored = localStorage.getItem(storageKey);
@@ -163,12 +167,19 @@ function App() {
         {/* Wrap messages in separate scrollable container */}
         <div className="messages">
           {messages.map((message) => (
-            <div key={message.id} className="message">
+            <div
+              key={message.id}
+              className="message"
+              style={{
+                backgroundColor: isDarkColor(message.color || "#ffffff")
+                  ? "#808080"
+                  : undefined,
+              }}
+            >
               <div
                 className="message-content"
                 style={{
                   color: message.color || "#ffffff",
-                  textShadow: getTextShadow(message.color || "#ffffff"),
                 }}
               >
                 <strong>{message.user}:</strong> {message.content}
