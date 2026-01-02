@@ -55,6 +55,7 @@ function App() {
               content: message.content,
               user: message.user,
               role: message.role,
+              timestamp: message.timestamp,
             },
           ]);
         } else {
@@ -69,6 +70,7 @@ function App() {
                 content: message.content,
                 user: message.user,
                 role: message.role,
+                timestamp: message.timestamp,
               })
               .concat(messages.slice(foundIndex + 1));
           });
@@ -82,6 +84,7 @@ function App() {
                   content: message.content,
                   user: message.user,
                   role: message.role,
+                  timestamp: message.timestamp,
                 }
               : m
           )
@@ -107,7 +110,17 @@ function App() {
           {messages.map((message) => (
             <div key={message.id} className="row message">
               <div className="two columns user">{message.user}</div>
-              <div className="ten columns">{message.content}</div>
+              <div className="ten columns">
+                {message.content}
+                <br />
+                <small>
+                  {new Date(message.timestamp).toLocaleDateString()}{" "}
+                  {new Date(message.timestamp).toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </small>
+              </div>
             </div>
           ))}
           {/* Add invisible element at the end for scrolling reference */}
@@ -126,6 +139,7 @@ function App() {
               content: content.value,
               user: name,
               role: "user",
+              timestamp: new Date().toISOString(),
             };
             setMessages((messages) => [...messages, chatMessage]);
             // we could broadcast the message here
