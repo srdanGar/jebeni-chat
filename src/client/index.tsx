@@ -48,6 +48,8 @@ function App() {
 
   const [editingName, setEditingName] = useState(false);
   const [tempName, setTempName] = useState(name);
+  const [userActivity, setUserActivity] = useState<Record<string, string>>({});
+  const [showActiveUsers, setShowActiveUsers] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(false);
 
   const colors = [
@@ -109,6 +111,10 @@ function App() {
               color: message.color,
             },
           ]);
+          setUserActivity((prev) => ({
+            ...prev,
+            [message.user]: message.timestamp,
+          }));
         } else {
           // this usually means we ourselves added a message
           // and it was broadcasted back
@@ -126,6 +132,10 @@ function App() {
               })
               .concat(messages.slice(foundIndex + 1));
           });
+          setUserActivity((prev) => ({
+            ...prev,
+            [message.user]: message.timestamp,
+          }));
         }
       } else if (message.type === "update") {
         setMessages((messages) =>
@@ -142,24 +152,62 @@ function App() {
               : m
           )
         );
+        setUserActivity((prev) => ({
+          ...prev,
+          [message.user]: message.timestamp,
+        }));
       } else {
         setMessages(message.messages);
+        // Build user activity from all messages
+        const activity: Record<string, string> = {};
+        message.messages.forEach((msg) => {
+          activity[msg.user] = msg.timestamp;
+        });
+        setUserActivity(activity);
       }
     },
   });
 
   const messagesEndRef = useRef<HTMLDivElement>(null); // Add ref for scrolling to bottom
+  const messagesContainerRef = useRef<HTMLDivElement>(null); // Ref for the messages container
+  const hasReceivedInitialMessages = useRef(false); // Track if we've received initial messages
+
+  // Get users active in the last hour
+  const getActiveUsers = () => {
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    return Object.entries(userActivity)
+      .filter(([_, timestamp]) => timestamp >= oneHourAgo)
+      .map(([user, timestamp]) => ({ user, timestamp }))
+      .sort((a, b) => b.timestamp.localeCompare(a.timestamp)); // Sort by most recent
+  };
 
   // Add useEffect to auto-scroll to bottom on new messages
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+    const container = messagesContainerRef.current;
+    if (container && messages.length > 0) {
+      const isScrolledToBottom =
+        container.scrollHeight - container.scrollTop <=
+        container.clientHeight + 10; // 10px tolerance
+
+      const lastMessage = messages[messages.length - 1];
+      const isOwnMessage = lastMessage && lastMessage.user === name;
+
+      // Always set position to bottom when first receiving messages
+      if (!hasReceivedInitialMessages.current) {
+        container.scrollTop = container.scrollHeight;
+        hasReceivedInitialMessages.current = true;
+      } else if (isScrolledToBottom || isOwnMessage) {
+        // Auto-scroll smoothly if already at bottom OR if it's your own message
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      }
+    }
+  }, [messages, name]);
 
   return (
     <>
       <div className="chat">
         {/* Wrap messages in separate scrollable container */}
-        <div className="messages">
+        <div className="messages" ref={messagesContainerRef}>
           {messages.map((message) => (
             <div
               key={message.id}
@@ -297,6 +345,41 @@ function App() {
           </>
         )}
       </div>
+      {/* Active users button */}
+      <button
+        onClick={() => setShowActiveUsers(!showActiveUsers)}
+        className="active-users-button"
+        title="Show active users"
+      >
+        <span className="mdi mdi-account-group"></span>
+      </button>
+      {/* Active users popup */}
+      {showActiveUsers && (
+        <div className="active-users-popup">
+          <div className="active-users-header">
+            <h4>Active Users (last hour)</h4>
+            <button
+              onClick={() => setShowActiveUsers(false)}
+              className="close-button"
+            >
+              ×
+            </button>
+          </div>
+          <div className="users-list">
+            {getActiveUsers().map(({ user, timestamp }) => (
+              <div key={user} className="user-row">
+                <span className="user-nick">{user}</span>
+                <span className="user-last-seen">
+                  {new Date(timestamp).toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </>
   );
 }
