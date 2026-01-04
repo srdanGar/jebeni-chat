@@ -272,7 +272,10 @@ function App() {
             </button>
             <button
               onClick={() => setShowColorPicker(!showColorPicker)}
-              style={{ backgroundColor: selectedColor, color: "white" }}
+              style={{
+                backgroundColor: selectedColor,
+                color: selectedColor === "#ffffff" ? "black" : "white",
+              }}
             >
               Choose Color
             </button>
