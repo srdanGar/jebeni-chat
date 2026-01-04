@@ -85,6 +85,26 @@ export class Chat extends Server<Env> {
     );
   }
 
+  clearOldMessages(hours: number) {
+    const cutoffTime = new Date(
+      Date.now() - hours * 60 * 60 * 1000
+    ).toISOString();
+
+    // Delete from database
+    this.ctx.storage.sql.exec(
+      `DELETE FROM messages WHERE timestamp < '${cutoffTime}'`
+    );
+
+    // Update in-memory array
+    this.messages = this.messages.filter((msg) => msg.timestamp >= cutoffTime);
+
+    // Broadcast the updated messages list
+    this.broadcastMessage({
+      type: "all",
+      messages: this.messages,
+    });
+  }
+
   onMessage(connection: Connection, message: WSMessage) {
     // let's broadcast the raw message to everyone else
     this.broadcast(message);
@@ -94,6 +114,27 @@ export class Chat extends Server<Env> {
     if (parsed.type === "add" || parsed.type === "update") {
       this.saveMessage(parsed);
     }
+  }
+
+  async onFetch(request: Request) {
+    const url = new URL(request.url);
+    if (url.pathname === "/clearOld") {
+      const hoursParam = url.searchParams.get("hours");
+      const hours = hoursParam ? parseInt(hoursParam, 10) : 12;
+
+      if (isNaN(hours) || hours < 1 || hours > 12) {
+        return new Response(
+          "Invalid hours parameter. Must be between 1 and 12.",
+          { status: 400 }
+        );
+      }
+
+      this.clearOldMessages(hours);
+      return new Response(`Messages older than ${hours} hours cleared`, {
+        status: 200,
+      });
+    }
+    return new Response("Not found", { status: 404 });
   }
 }
 
