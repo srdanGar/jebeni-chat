@@ -51,6 +51,10 @@ function App() {
   const [userActivity, setUserActivity] = useState<Record<string, string>>({});
   const [showActiveUsers, setShowActiveUsers] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(
+    null,
+  );
 
   const colors = [
     "#ffffff",
@@ -149,8 +153,8 @@ function App() {
                   timestamp: message.timestamp,
                   color: message.color,
                 }
-              : m
-          )
+              : m,
+          ),
         );
         setUserActivity((prev) => ({
           ...prev,
@@ -203,6 +207,36 @@ function App() {
     }
   }, [messages, name]);
 
+  const renderContent = (content: string) => {
+    const vocarooMatch = content.match(
+      /https:\/\/vocaroo\.com\/([a-zA-Z0-9]+)/,
+    );
+    if (vocarooMatch) {
+      return (
+        <iframe
+          src={`https://vocaroo.com/embed/${vocarooMatch[1]}`}
+          width="300"
+          height="60"
+          frameBorder="0"
+          title="Vocaroo Audio"
+        ></iframe>
+      );
+    }
+    if (content.startsWith("data:audio/")) {
+      return <audio controls src={content} style={{ maxWidth: "300px" }} />;
+    }
+    if (content.startsWith("audio:")) {
+      return (
+        <audio
+          controls
+          src={`/audio/${content.slice(6)}`}
+          style={{ maxWidth: "300px" }}
+        />
+      );
+    }
+    return content;
+  };
+
   return (
     <>
       <div className="chat">
@@ -224,7 +258,8 @@ function App() {
                   color: message.color || "#ffffff",
                 }}
               >
-                <strong>{message.user}:</strong> {message.content}
+                <strong>{message.user}:</strong>{" "}
+                {renderContent(message.content)}
                 <br />
                 <small>
                   {new Date(message.timestamp).toLocaleDateString()}{" "}
@@ -245,7 +280,7 @@ function App() {
           onSubmit={(e) => {
             e.preventDefault();
             const content = e.currentTarget.elements.namedItem(
-              "content"
+              "content",
             ) as HTMLInputElement;
             const chatMessage: ChatMessage = {
               id: nanoid(8),
@@ -262,7 +297,7 @@ function App() {
               JSON.stringify({
                 type: "add",
                 ...chatMessage,
-              } satisfies Message)
+              } satisfies Message),
             );
 
             content.value = "";
@@ -271,10 +306,81 @@ function App() {
           <input
             type="text"
             name="content"
-            className="ten columns my-input-text"
+            className="eight columns my-input-text"
             placeholder={`Hello ${name}! Type a message...`}
             autoComplete="off"
           />
+          <button
+            type="button"
+            onClick={async () => {
+              if (isRecording) {
+                // Stop recording
+                if (mediaRecorder) {
+                  mediaRecorder.stop();
+                }
+                setIsRecording(false);
+              } else {
+                // Start recording
+                try {
+                  const stream = await navigator.mediaDevices.getUserMedia({
+                    audio: true,
+                  });
+                  const recorder = new MediaRecorder(stream);
+                  const chunks: Blob[] = [];
+
+                  recorder.ondataavailable = (event) => {
+                    chunks.push(event.data);
+                  };
+
+                  recorder.onstop = () => {
+                    const blob = new Blob(chunks, { type: "audio/webm" });
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                      const base64 = reader.result as string;
+                      const chatMessage: ChatMessage = {
+                        id: nanoid(8),
+                        content: base64,
+                        user: name,
+                        role: "user",
+                        timestamp: new Date().toISOString(),
+                        color: selectedColor,
+                      };
+                      setMessages((messages) => [...messages, chatMessage]);
+                      socket.send(
+                        JSON.stringify({
+                          type: "add",
+                          ...chatMessage,
+                        } satisfies Message),
+                      );
+                    };
+                    reader.readAsDataURL(blob);
+                    stream.getTracks().forEach((track) => track.stop());
+                  };
+
+                  recorder.start();
+                  setMediaRecorder(recorder);
+                  setIsRecording(true);
+
+                  // Auto-stop after 10 seconds
+                  setTimeout(() => {
+                    if (recorder.state === "recording") {
+                      recorder.stop();
+                      setIsRecording(false);
+                    }
+                  }, 10000);
+                } catch (error) {
+                  alert(
+                    "Microphone access is required to record voice messages. Please allow microphone access and try again.",
+                  );
+                }
+              }
+            }}
+            className="mic-button two columns"
+            title={isRecording ? "Stop recording" : "Record voice message"}
+            style={{ backgroundColor: isRecording ? "red" : undefined }}
+          >
+            {isRecording ? "⏹️" : "🎤"}
+          </button>
           <button type="submit" className="send-message two columns">
             Send
           </button>
@@ -394,5 +500,5 @@ createRoot(document.getElementById("root")!).render(
       <Route path="/9FexDdTqo9kdtdgg0WukK" element={<App />} />
       <Route path="*" element={<Navigate to="/9FexDdTqo9kdtdgg0WukK" />} />
     </Routes>
-  </BrowserRouter>
+  </BrowserRouter>,
 );

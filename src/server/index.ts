@@ -22,13 +22,13 @@ export class Chat extends Server<Env> {
 
     // create the messages table if it doesn't exist
     this.ctx.storage.sql.exec(
-      `CREATE TABLE IF NOT EXISTS messages (id TEXT PRIMARY KEY, user TEXT, role TEXT, content TEXT, timestamp TEXT, color TEXT)`
+      `CREATE TABLE IF NOT EXISTS messages (id TEXT PRIMARY KEY, user TEXT, role TEXT, content TEXT, timestamp TEXT, color TEXT)`,
     );
 
     // add timestamp column if it doesn't exist (for schema evolution)
     try {
       this.ctx.storage.sql.exec(
-        `ALTER TABLE messages ADD COLUMN timestamp TEXT`
+        `ALTER TABLE messages ADD COLUMN timestamp TEXT`,
       );
     } catch (e) {
       // column might already exist
@@ -44,7 +44,7 @@ export class Chat extends Server<Env> {
     // load the messages from the database
     this.messages = this.ctx.storage.sql
       .exec(
-        `SELECT id, user, role, content, COALESCE(timestamp, '${new Date().toISOString()}') as timestamp, color FROM messages`
+        `SELECT id, user, role, content, COALESCE(timestamp, '${new Date().toISOString()}') as timestamp, color FROM messages`,
       )
       .toArray() as ChatMessage[];
   }
@@ -54,7 +54,7 @@ export class Chat extends Server<Env> {
       JSON.stringify({
         type: "all",
         messages: this.messages,
-      } satisfies Message)
+      } satisfies Message),
     );
   }
 
@@ -76,23 +76,23 @@ export class Chat extends Server<Env> {
       `INSERT INTO messages (id, user, role, content, timestamp, color) VALUES ('${
         message.id
       }', '${message.user}', '${message.role}', ${JSON.stringify(
-        message.content
+        message.content,
       )}, '${message.timestamp}', '${
         message.color || ""
       }') ON CONFLICT (id) DO UPDATE SET content = ${JSON.stringify(
-        message.content
-      )}, timestamp = '${message.timestamp}', color = '${message.color || ""}'`
+        message.content,
+      )}, timestamp = '${message.timestamp}', color = '${message.color || ""}'`,
     );
   }
 
   clearOldMessages(hours: number) {
     const cutoffTime = new Date(
-      Date.now() - hours * 60 * 60 * 1000
+      Date.now() - hours * 60 * 60 * 1000,
     ).toISOString();
 
     // Delete from database
     this.ctx.storage.sql.exec(
-      `DELETE FROM messages WHERE timestamp < '${cutoffTime}'`
+      `DELETE FROM messages WHERE timestamp < '${cutoffTime}'`,
     );
 
     // Update in-memory array
@@ -112,12 +112,28 @@ export class Chat extends Server<Env> {
     // let's update our local messages store
     const parsed = JSON.parse(message as string) as Message;
     if (parsed.type === "add" || parsed.type === "update") {
+      // If content is base64 audio, store it separately
+      if (parsed.content.startsWith("data:audio/")) {
+        const audioKey = `audio:${parsed.id}`;
+        this.ctx.storage.put(audioKey, parsed.content);
+        parsed.content = audioKey;
+      }
       this.saveMessage(parsed);
     }
   }
 
   async onFetch(request: Request) {
     const url = new URL(request.url);
+    if (url.pathname.startsWith("/audio/")) {
+      const audioKey = `audio:${url.pathname.slice(7)}`;
+      const audioData = await this.ctx.storage.get(audioKey);
+      if (audioData) {
+        return new Response(audioData as string, {
+          headers: { "Content-Type": "audio/webm" },
+        });
+      }
+      return new Response("Not found", { status: 404 });
+    }
     if (url.pathname === "/clearOld") {
       const hoursParam = url.searchParams.get("hours");
       const hours = hoursParam ? parseInt(hoursParam, 10) : 12;
@@ -125,7 +141,7 @@ export class Chat extends Server<Env> {
       if (isNaN(hours) || hours < 1 || hours > 12) {
         return new Response(
           "Invalid hours parameter. Must be between 1 and 12.",
-          { status: 400 }
+          { status: 400 },
         );
       }
 
@@ -140,9 +156,22 @@ export class Chat extends Server<Env> {
 
 export default {
   async fetch(request, env) {
-    return (
+    const url = new URL(request.url);
+    let response =
       (await routePartykitRequest(request, { ...env })) ||
-      env.ASSETS.fetch(request)
-    );
+      (await env.ASSETS.fetch(request));
+
+    // Add permissions policy header for microphone access
+    if (url.pathname === "/" || url.pathname === "/index.html") {
+      const newHeaders = new Headers(response.headers);
+      newHeaders.set("Permissions-Policy", "microphone=(self)");
+      response = new Response(response.body, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: newHeaders,
+      });
+    }
+
+    return response;
   },
 } satisfies ExportedHandler<Env>;
