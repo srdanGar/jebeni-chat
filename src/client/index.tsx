@@ -5,45 +5,40 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router";
 import { nanoid } from "nanoid";
 
 import { names, type ChatMessage, type Message } from "../shared";
+import { uploadAudio, uploadImage, cleanupOldMedia } from "../supabase-service";
+import { MessageList } from "./MessageList";
+import { InputForm } from "./InputForm";
+import { NicknameEdit } from "./NicknameEdit";
+import { ActiveUsers } from "./ActiveUsers";
+import { renderContent, isDarkColor, getActiveUsers } from "./utils";
+import { useAutoScroll } from "./useAutoScroll";
+import { useAudioRecording } from "./useAudioRecording";
 
 function App() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const room = "9FexDdTqo9kdtdgg0WukK";
 
   const storageKey = `chat:name${room ? ":" + room : ""}`;
-
-  const getTextShadow = (color: string) => {
-    const r = parseInt(color.slice(1, 3), 16);
-    const g = parseInt(color.slice(3, 5), 16);
-    const b = parseInt(color.slice(5, 7), 16);
-    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-    return luminance < 0.5 ? "1px 1px 2px rgba(128, 128, 128, 0.7)" : "none";
-  };
-
-  const isDarkColor = (color: string) => {
-    return color === "#000000" || color === "#0000ff" || color === "#000080";
-  };
+  const colorStorageKey = `chat:color${room ? ":" + room : ""}`;
 
   const [name, setName] = useState(() => {
     try {
       const stored = localStorage.getItem(storageKey);
       if (stored) return stored;
     } catch (e) {
-      // localStorage may be unavailable; fall back to random
+      // localStorage may be unavailable
     }
     return names[Math.floor(Math.random() * names.length)];
   });
-
-  const colorStorageKey = `chat:color${room ? ":" + room : ""}`;
 
   const [selectedColor, setSelectedColor] = useState(() => {
     try {
       const stored = localStorage.getItem(colorStorageKey);
       if (stored) return stored;
     } catch (e) {
-      // localStorage may be unavailable; fall back to default
+      // localStorage may be unavailable
     }
-    return "#ffffff"; // default white
+    return "#ffffff";
   });
 
   const [editingName, setEditingName] = useState(false);
@@ -51,10 +46,25 @@ function App() {
   const [userActivity, setUserActivity] = useState<Record<string, string>>({});
   const [showActiveUsers, setShowActiveUsers] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
-  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(
-    null,
-  );
+  const [taggedUser, setTaggedUser] = useState<string>("");
+
+  const inputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+
+  const {
+    isRecording,
+    setIsRecording,
+    mediaRecorder,
+    setMediaRecorder,
+    micPermission,
+  } = useAudioRecording();
+
+  const messagesEndRef = useAutoScroll({
+    messages,
+    name,
+    messagesContainerRef,
+  });
 
   const colors = [
     "#ffffff",
@@ -103,7 +113,6 @@ function App() {
       if (message.type === "add") {
         const foundIndex = messages.findIndex((m) => m.id === message.id);
         if (foundIndex === -1) {
-          // probably someone else who added a message
           setMessages((messages) => [
             ...messages,
             {
@@ -113,6 +122,8 @@ function App() {
               role: message.role,
               timestamp: message.timestamp,
               color: message.color,
+              messageType: message.messageType,
+              taggedUser: message.taggedUser,
             },
           ]);
           setUserActivity((prev) => ({
@@ -120,9 +131,6 @@ function App() {
             [message.user]: message.timestamp,
           }));
         } else {
-          // this usually means we ourselves added a message
-          // and it was broadcasted back
-          // so let's replace the message with the new message
           setMessages((messages) => {
             return messages
               .slice(0, foundIndex)
@@ -133,6 +141,8 @@ function App() {
                 role: message.role,
                 timestamp: message.timestamp,
                 color: message.color,
+                messageType: message.messageType,
+                taggedUser: message.taggedUser,
               })
               .concat(messages.slice(foundIndex + 1));
           });
@@ -152,6 +162,8 @@ function App() {
                   role: message.role,
                   timestamp: message.timestamp,
                   color: message.color,
+                  messageType: message.messageType,
+                  taggedUser: message.taggedUser,
                 }
               : m,
           ),
@@ -160,9 +172,10 @@ function App() {
           ...prev,
           [message.user]: message.timestamp,
         }));
+      } else if (message.type === "delete") {
+        setMessages((messages) => messages.filter((m) => m.id !== message.id));
       } else {
         setMessages(message.messages);
-        // Build user activity from all messages
         const activity: Record<string, string> = {};
         message.messages.forEach((msg) => {
           activity[msg.user] = msg.timestamp;
@@ -172,320 +185,203 @@ function App() {
     },
   });
 
-  const messagesEndRef = useRef<HTMLDivElement>(null); // Add ref for scrolling to bottom
-  const messagesContainerRef = useRef<HTMLDivElement>(null); // Ref for the messages container
-  const hasReceivedInitialMessages = useRef(false); // Track if we've received initial messages
-
-  // Get users active in the last hour
-  const getActiveUsers = () => {
-    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-    return Object.entries(userActivity)
-      .filter(([_, timestamp]) => timestamp >= oneHourAgo)
-      .map(([user, timestamp]) => ({ user, timestamp }))
-      .sort((a, b) => b.timestamp.localeCompare(a.timestamp)); // Sort by most recent
+  const handleDeleteMessage = (messageId: string, messageUser: string) => {
+    if (messageUser === name) {
+      socket.send(
+        JSON.stringify({
+          type: "delete",
+          id: messageId,
+        } satisfies Message),
+      );
+    }
   };
 
-  // Add useEffect to auto-scroll to bottom on new messages
-  useEffect(() => {
-    const container = messagesContainerRef.current;
-    if (container && messages.length > 0) {
-      const isScrolledToBottom =
-        container.scrollHeight - container.scrollTop <=
-        container.clientHeight + 10; // 10px tolerance
+  const handleTagUser = (userName: string) => {
+    setTaggedUser(userName);
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  };
 
-      const lastMessage = messages[messages.length - 1];
-      const isOwnMessage = lastMessage && lastMessage.user === name;
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-      // Always set position to bottom when first receiving messages
-      if (!hasReceivedInitialMessages.current) {
-        container.scrollTop = container.scrollHeight;
-        hasReceivedInitialMessages.current = true;
-      } else if (isScrolledToBottom || isOwnMessage) {
-        // Auto-scroll smoothly if already at bottom OR if it's your own message
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    try {
+      const filename = `${nanoid()}_${file.name}`;
+      const imageUrl = await uploadImage(filename, file);
+      await cleanupOldMedia("images");
+
+      const chatMessage: ChatMessage = {
+        id: nanoid(8),
+        content: imageUrl,
+        user: name,
+        role: "user",
+        timestamp: new Date().toISOString(),
+        color: selectedColor,
+        messageType: "image",
+        taggedUser: taggedUser || undefined,
+      };
+
+      setMessages((messages) => [...messages, chatMessage]);
+      setTaggedUser("");
+
+      socket.send(
+        JSON.stringify({
+          type: "add",
+          ...chatMessage,
+        } satisfies Message),
+      );
+
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
       }
+    } catch (err) {
+      console.error("Image upload failed:", err);
+      alert("Failed to upload image");
     }
-  }, [messages, name]);
+  };
 
-  const renderContent = (content: string) => {
-    const vocarooMatch = content.match(
-      /https:\/\/vocaroo\.com\/([a-zA-Z0-9]+)/,
+  const handleMicClick = async () => {
+    if (isRecording && mediaRecorder) {
+      mediaRecorder.stop();
+      setIsRecording(false);
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+      });
+
+      let recorder: MediaRecorder;
+      try {
+        recorder = new MediaRecorder(stream, {
+          mimeType: "audio/mp4; codecs=mp4a.40.2",
+        });
+      } catch {
+        recorder = new MediaRecorder(stream);
+      }
+
+      const chunks: Blob[] = [];
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunks.push(e.data);
+      };
+
+      recorder.onstop = async () => {
+        const mimeType = recorder.mimeType || "audio/webm";
+        const blob = new Blob(chunks, { type: mimeType });
+
+        try {
+          const format = mimeType.split("/")[1].split(";")[0];
+          const filename = `${nanoid()}.${format}`;
+          const audioUrl = await uploadAudio(filename, blob);
+          await cleanupOldMedia("audio");
+
+          const chatMessage: ChatMessage = {
+            id: nanoid(8),
+            content: audioUrl,
+            user: name,
+            role: "user",
+            timestamp: new Date().toISOString(),
+            color: selectedColor,
+            messageType: "audio",
+            taggedUser: taggedUser || undefined,
+          };
+
+          setMessages((m) => [...m, chatMessage]);
+          setTaggedUser("");
+
+          socket.send(
+            JSON.stringify({
+              type: "add",
+              ...chatMessage,
+            } satisfies Message),
+          );
+        } catch (err) {
+          console.error("Failed to upload audio:", err);
+          alert("Failed to upload audio message");
+        }
+
+        stream.getTracks().forEach((t) => t.stop());
+      };
+
+      recorder.start();
+      setMediaRecorder(recorder);
+      setIsRecording(true);
+
+      setTimeout(() => {
+        if (recorder.state === "recording") {
+          recorder.stop();
+          setIsRecording(false);
+        }
+      }, 10_000);
+    } catch (err) {
+      console.error(err);
+      alert("Microphone permission is required to send voice messages.");
+    }
+  };
+
+  const handleFormSubmit = (message: ChatMessage) => {
+    setMessages((messages) => [...messages, message]);
+    setTaggedUser("");
+
+    socket.send(
+      JSON.stringify({
+        type: "add",
+        ...message,
+      } satisfies Message),
     );
-    if (vocarooMatch) {
-      return (
-        <iframe
-          src={`https://vocaroo.com/embed/${vocarooMatch[1]}`}
-          width="300"
-          height="60"
-          frameBorder="0"
-          title="Vocaroo Audio"
-        ></iframe>
-      );
-    }
-    if (content.startsWith("data:audio/")) {
-      return <audio controls src={content} style={{ maxWidth: "300px" }} />;
-    }
-    if (content.startsWith("audio:")) {
-      return (
-        <audio
-          controls
-          src={`/audio/${content.slice(6)}`}
-          style={{ maxWidth: "300px" }}
-        />
-      );
-    }
-    return content;
   };
 
   return (
     <>
       <div className="chat">
-        {/* Wrap messages in separate scrollable container */}
-        <div className="messages" ref={messagesContainerRef}>
-          {messages.map((message) => (
-            <div
-              key={message.id}
-              className="message"
-              style={{
-                backgroundColor: isDarkColor(message.color || "#ffffff")
-                  ? "#808080"
-                  : undefined,
-              }}
-            >
-              <div
-                className="message-content"
-                style={{
-                  color: message.color || "#ffffff",
-                }}
-              >
-                <strong>{message.user}:</strong>{" "}
-                {renderContent(message.content)}
-                <br />
-                <small>
-                  {new Date(message.timestamp).toLocaleDateString()}{" "}
-                  {new Date(message.timestamp).toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </small>
-              </div>
-            </div>
-          ))}
-          {/* Add invisible element at the end for scrolling reference */}
-          <div ref={messagesEndRef} />
-        </div>
+        <MessageList
+          messages={messages}
+          name={name}
+          onTagUser={handleTagUser}
+          onDeleteMessage={handleDeleteMessage}
+          isDarkColor={isDarkColor}
+          renderContent={renderContent}
+          messagesContainerRef={messagesContainerRef}
+          messagesEndRef={messagesEndRef}
+        />
 
-        <form
-          className="row"
-          onSubmit={(e) => {
-            e.preventDefault();
-            const content = e.currentTarget.elements.namedItem(
-              "content",
-            ) as HTMLInputElement;
-            const chatMessage: ChatMessage = {
-              id: nanoid(8),
-              content: content.value,
-              user: name,
-              role: "user",
-              timestamp: new Date().toISOString(),
-              color: selectedColor,
-            };
-            setMessages((messages) => [...messages, chatMessage]);
-            // we could broadcast the message here
-
-            socket.send(
-              JSON.stringify({
-                type: "add",
-                ...chatMessage,
-              } satisfies Message),
-            );
-
-            content.value = "";
-          }}
-        >
-          <input
-            type="text"
-            name="content"
-            className="eight columns my-input-text"
-            placeholder={`Hello ${name}! Type a message...`}
-            autoComplete="off"
-          />
-          <button
-            type="button"
-            onClick={async () => {
-              if (isRecording) {
-                // Stop recording
-                if (mediaRecorder) {
-                  mediaRecorder.stop();
-                }
-                setIsRecording(false);
-              } else {
-                // Start recording
-                try {
-                  const stream = await navigator.mediaDevices.getUserMedia({
-                    audio: true,
-                  });
-                  const recorder = new MediaRecorder(stream);
-                  const chunks: Blob[] = [];
-
-                  recorder.ondataavailable = (event) => {
-                    chunks.push(event.data);
-                  };
-
-                  recorder.onstop = () => {
-                    const blob = new Blob(chunks, { type: "audio/webm" });
-                    const reader = new FileReader();
-                    reader.onload = () => {
-                      const base64 = reader.result as string;
-                      const chatMessage: ChatMessage = {
-                        id: nanoid(8),
-                        content: base64,
-                        user: name,
-                        role: "user",
-                        timestamp: new Date().toISOString(),
-                        color: selectedColor,
-                      };
-                      setMessages((messages) => [...messages, chatMessage]);
-                      socket.send(
-                        JSON.stringify({
-                          type: "add",
-                          ...chatMessage,
-                        } satisfies Message),
-                      );
-                    };
-                    reader.readAsDataURL(blob);
-                    stream.getTracks().forEach((track) => track.stop());
-                  };
-
-                  recorder.start();
-                  setMediaRecorder(recorder);
-                  setIsRecording(true);
-
-                  // Auto-stop after 10 seconds
-                  setTimeout(() => {
-                    if (recorder.state === "recording") {
-                      recorder.stop();
-                      setIsRecording(false);
-                    }
-                  }, 10000);
-                } catch (error) {
-                  alert(
-                    "Microphone access is required to record voice messages. Please allow microphone access and try again.",
-                  );
-                }
-              }
-            }}
-            className="mic-button two columns"
-            title={isRecording ? "Stop recording" : "Record voice message"}
-            style={{ backgroundColor: isRecording ? "red" : undefined }}
-          >
-            {isRecording ? "⏹️" : "🎤"}
-          </button>
-          <button type="submit" className="send-message two columns">
-            Send
-          </button>
-        </form>
+        <InputForm
+          inputRef={inputRef}
+          fileInputRef={fileInputRef}
+          name={name}
+          taggedUser={taggedUser}
+          isRecording={isRecording}
+          selectedColor={selectedColor}
+          onSubmit={handleFormSubmit}
+          onClearTag={() => setTaggedUser("")}
+          onMicClick={handleMicClick}
+          onImageUpload={handleImageUpload}
+        />
       </div>
-      {/* Add the nickname edit UI here, positioned left via CSS */}
-      <div className="nickname-edit">
-        {editingName ? (
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              const newName = tempName.trim();
-              if (newName.length > 0) setName(newName);
-              setEditingName(false);
-            }}
-          >
-            <input
-              value={tempName}
-              onChange={(e) => setTempName(e.currentTarget.value)}
-              className="my-input-text"
-              autoComplete="off"
-            />
-            <button type="submit">Save</button>
-            <button
-              type="button"
-              onClick={() => {
-                setEditingName(false);
-                setTempName(name);
-              }}
-            >
-              Cancel
-            </button>
-          </form>
-        ) : (
-          <>
-            <button
-              onClick={() => {
-                setTempName(name);
-                setEditingName(true);
-              }}
-            >
-              Edit Nickname
-            </button>
-            <button
-              onClick={() => setShowColorPicker(!showColorPicker)}
-              style={{
-                backgroundColor: selectedColor,
-                color: selectedColor === "#ffffff" ? "black" : "white",
-              }}
-            >
-              Choose Color
-            </button>
-            {showColorPicker && (
-              <div className="color-picker">
-                {colors.map((color) => (
-                  <div
-                    key={color}
-                    className="color-swatch"
-                    style={{ backgroundColor: color }}
-                    onClick={() => {
-                      setSelectedColor(color);
-                      setShowColorPicker(false);
-                    }}
-                  />
-                ))}
-              </div>
-            )}
-          </>
-        )}
-      </div>
-      {/* Active users button */}
-      <button
-        onClick={() => setShowActiveUsers(!showActiveUsers)}
-        className="active-users-button"
-        title="Show active users"
-      >
-        <span className="mdi mdi-account-group"></span>
-      </button>
-      {/* Active users popup */}
-      {showActiveUsers && (
-        <div className="active-users-popup">
-          <div className="active-users-header">
-            <h4>Active Users (last hour)</h4>
-            <button
-              onClick={() => setShowActiveUsers(false)}
-              className="close-button"
-            >
-              ×
-            </button>
-          </div>
-          <div className="users-list">
-            {getActiveUsers().map(({ user, timestamp }) => (
-              <div key={user} className="user-row">
-                <span className="user-nick">{user}</span>
-                <span className="user-last-seen">
-                  {new Date(timestamp).toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+
+      <NicknameEdit
+        editingName={editingName}
+        tempName={tempName}
+        name={name}
+        selectedColor={selectedColor}
+        showColorPicker={showColorPicker}
+        colors={colors}
+        onSetEditingName={setEditingName}
+        onSetTempName={setTempName}
+        onSetName={setName}
+        onSetSelectedColor={setSelectedColor}
+        onSetShowColorPicker={setShowColorPicker}
+      />
+
+      <ActiveUsers
+        showActiveUsers={showActiveUsers}
+        onSetShowActiveUsers={setShowActiveUsers}
+        activeUsers={getActiveUsers(userActivity)}
+      />
     </>
   );
 }
@@ -494,9 +390,7 @@ function App() {
 createRoot(document.getElementById("root")!).render(
   <BrowserRouter>
     <Routes>
-      {/*<Route path="/" element={<Navigate to={`/${nanoid()}`} />} />*/}
       <Route path="/" element={<Navigate to="/9FexDdTqo9kdtdgg0WukK" />} />
-      {/* <Route path="/:room" element={<App />} /> */}
       <Route path="/9FexDdTqo9kdtdgg0WukK" element={<App />} />
       <Route path="*" element={<Navigate to="/9FexDdTqo9kdtdgg0WukK" />} />
     </Routes>

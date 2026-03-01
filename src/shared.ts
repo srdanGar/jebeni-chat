@@ -5,6 +5,8 @@ export type ChatMessage = {
   role: "user" | "assistant";
   timestamp: string;
   color?: string;
+  messageType?: "text" | "audio" | "image";
+  taggedUser?: string;
 };
 
 export type Message =
@@ -16,6 +18,8 @@ export type Message =
       role: "user" | "assistant";
       timestamp: string;
       color?: string;
+      messageType?: "text" | "audio" | "image";
+      taggedUser?: string;
     }
   | {
       type: "update";
@@ -25,6 +29,12 @@ export type Message =
       role: "user" | "assistant";
       timestamp: string;
       color?: string;
+      messageType?: "text" | "audio" | "image";
+      taggedUser?: string;
+    }
+  | {
+      type: "delete";
+      id: string;
     }
   | {
       type: "all";

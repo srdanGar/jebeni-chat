@@ -28,15 +28,45 @@ A live public deployment of this template is available at [https://durable-chat-
 
 ## Setup Steps
 
-1. Install the project dependencies with a package manager of your choice:
+1. Install the project dependencies:
+
    ```bash
    npm install
    ```
-2. Deploy the project!
+
+2. **Configure Supabase** (for audio and image storage):
+   - Follow the steps in [SUPABASE_SETUP.md](./SUPABASE_SETUP.md)
+   - Get your Supabase anon key from Project Settings > API
+   - Add it to `.env.local`:
+     ```
+     VITE_SUPABASE_URL=https://YOUR_PROJECT_ID.supabase.co
+     VITE_SUPABASE_ANON_KEY=your_anon_key_here
+     ```
+
+3. Start development:
+
    ```bash
-   npx wrangler deploy
+   npm run dev
    ```
-3. Monitor your worker
+
+4. Deploy the project:
+
+   ```bash
+   npm run deploy
+   ```
+
+5. Monitor your worker:
    ```bash
    npx wrangler tail
    ```
+
+## Features
+
+- 💬 Real-time chat with WebSocket
+- 🎤 Audio message recording and storage
+- 🖼️ Image sharing
+- 🏷️ Tag/mention users in messages
+- 🗑️ Delete your own messages
+- 🎨 Customizable user colors
+- 👥 Active users panel
+- 📊 Message history stored in Durable Objects SQL

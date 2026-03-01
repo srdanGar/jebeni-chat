@@ -147,41 +147,199 @@ html {
   flex: 1;
   display: flex;
   flex-direction: column;
-  /* Removed overflow-y: auto and justify-content: flex-end to avoid scrolling the whole thing */
   height: 100%;
 }
 
 .message {
   margin-bottom: 10px;
   background-color: #3e2723; /* Dark brown background for messages */
-  padding: 5px;
+  padding: 8px;
   border-radius: 5px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+  position: relative;
 }
 
-.message .user {
+.message-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 5px;
+}
+
+.message-user {
   font-weight: bold;
-  text-align: right;
+  cursor: pointer;
+  user-select: none;
+  transition: opacity 0.2s;
 }
 
-.message .remove {
+.message-user:hover {
+  opacity: 0.8;
+}
+
+.message-content {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.delete-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 4px;
+  font-size: 14px;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+.delete-button:hover {
+  opacity: 1;
+}
+
+.tag-badge {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: #ccc;
+  padding: 2px 6px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+/* Form row styles */
+.form-row {
+  display: flex;
+  gap: 8px;
+  padding: 10px;
+  background-color: #1a1a1a;
+  border-top: 1px solid #555;
+  position: relative;
+}
+
+.input-field {
+  flex: 1;
+  padding: 10px;
+  border: 1px solid #555;
+  border-radius: 4px;
+  background-color: #333;
+  color: #fff;
+  font-size: 14px;
+}
+
+.input-field:focus {
+  outline: none;
+  border-color: #aaa;
+  background-color: #404040;
+}
+
+.input-field::placeholder {
+  color: #999;
+}
+
+.tag-input-badge {
   position: absolute;
-  width: 22px;
-  height: 20px;
-  left: -60px;
-  /* display: "block", */
-  display: none;
-  padding: 0;
-  line-height: 18px;
-  border: "none";
+  left: 15px;
+  top: 50%;
+  transform: translateY(-50%);
+  background-color: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  pointer-events: none;
+}
+
+.clear-tag-button {
+  background: none;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  padding: 0 2px;
+  font-size: 14px;
+  opacity: 0.7;
+}
+
+.clear-tag-button:hover {
+  opacity: 1;
 }
 
 .send-message {
-  padding: 0;
+  padding: 10px 16px;
+  background-color: #4caf50;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background-color 0.2s;
+}
+
+.send-message:hover {
+  background-color: #45a049;
+}
+
+.send-message:active {
+  background-color: #3d8b40;
+}
+
+.mic-button {
+  padding: 10px 14px;
+  background-color: #2196f3;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: background-color 0.2s;
+}
+
+.mic-button:hover {
+  background-color: #0b7dda;
+}
+
+.mic-button:active {
+  background-color: #0056b3;
+}
+
+.image-button {
+  padding: 10px 14px;
+  background-color: #ff9800;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: background-color 0.2s;
+}
+
+.image-button:hover {
+  background-color: #e68900;
+}
+
+.image-button:active {
+  background-color: #cc7700;
+}
+
+.my-input-text {
+  padding: 8px;
+  border: 1px solid #555;
+  border-radius: 4px;
+  background-color: #333;
+  color: #fff;
+  font-size: 14px;
+}
+
+.my-input-text:focus {
+  outline: none;
+  border-color: #aaa;
+  background-color: #404040;
 }
 
 .my-input-text::placeholder {
-  color: #ccc;
+  color: #999;
 }
 
 /* Color picker popup styles */
@@ -195,6 +353,9 @@ html {
   flex-wrap: wrap;
   gap: 5px;
   max-width: 200px;
+  z-index: 100;
+  top: -230px;
+  left: 0;
 }
 
 .color-swatch {
@@ -203,10 +364,14 @@ html {
   border-radius: 50%;
   cursor: pointer;
   border: 2px solid #555;
+  transition:
+    border-color 0.2s,
+    transform 0.2s;
 }
 
 .color-swatch:hover {
   border-color: #fff;
+  transform: scale(1.1);
 }
 
 /* Recorder modal */
