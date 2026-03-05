@@ -1,3 +1,76 @@
+.message-content audio {
+  height: 30px !important;
+  min-height: 30px !important;
+  max-height: 30px !important;
+}
+.message-content img {
+  max-height: 200px;
+  width: 100vw;
+  max-width: 100vw;
+  object-fit: contain;
+  display: block;
+}
+.compact-message {
+  padding: 6px 10px 10px 10px;
+  margin-bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.message-top-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.95em;
+  margin-bottom: 2px;
+}
+
+.message-date {
+  color: #bbb;
+  font-size: 0.85em;
+  margin-left: 10px;
+}
+
+.message-bottom-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  position: relative;
+}
+
+.compact-delete {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.1em;
+  opacity: 0.7;
+  padding: 2px 4px;
+  transition: opacity 0.2s;
+  margin-bottom: 0;
+}
+.message-bottom-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  position: relative;
+  min-height: 32px;
+}
+
+.message-content {
+  max-width: calc(100% - 32px);
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+/* Make audio messages smaller */
+
+.compact-delete:hover {
+  opacity: 1;
+}
 body,
 html {
   height: 100%;
