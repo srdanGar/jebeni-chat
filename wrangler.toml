@@ -40,5 +40,5 @@ VITE_SUPABASE_URL = "https://ogyilwjxojwfngzocvpg.supabase.co"
 
 # Production-level vars (non-secret). Secrets still go via `wrangler secret put --env production`
 [env.production.vars]
-VITE_SUPABASE_URL = "https://ogyilwjxojwfngzocvpg.supabase.co"
-VITE_SUPABASE_ANON_KEY ="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9neWlsd2p4b2p3Zm5nem9jdnBnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzExNzYwNjYsImV4cCI6MjA4Njc1MjA2Nn0.o--8Ht8ompWeQ8eHbbY2Wv4dkHOUvPVZmpD8QlwHynw"
+SUPABASE_URL = "https://ogyilwjxojwfngzocvpg.supabase.co"
+SUPABASE_ANON_KEY ="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9neWlsd2p4b2p3Zm5nem9jdnBnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzExNzYwNjYsImV4cCI6MjA4Njc1MjA2Nn0.o--8Ht8ompWeQ8eHbbY2Wv4dkHOUvPVZmpD8QlwHynw"

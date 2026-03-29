@@ -24,6 +24,7 @@ let supabaseUrl: string;
 let supabaseKey: string;
 
 if (isBrowser) {
+  console.log("Running in browser, using window.ENV for Supabase config.");
   supabaseUrl = window.ENV!.SUPABASE_URL!;
   supabaseKey = window.ENV!.SUPABASE_ANON_KEY || window.ENV!.SUPABASE_KEY!;
   if (!supabaseUrl || !supabaseKey) {
@@ -32,7 +33,7 @@ if (isBrowser) {
     );
   }
 } else {
-  const globalEnv = (globalThis as any).__ENV || {};
+  const globalEnv = (globalThis as any).ENV || {};
   supabaseUrl =
     globalEnv.SUPABASE_URL ||
     globalEnv.VITE_SUPABASE_URL ||

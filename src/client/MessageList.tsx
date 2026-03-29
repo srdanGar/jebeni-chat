@@ -10,6 +10,7 @@ interface MessageListProps {
   renderContent: (content: string, messageType?: string) => React.ReactNode;
   messagesContainerRef: React.RefObject<HTMLDivElement>;
   messagesEndRef: React.RefObject<HTMLDivElement>;
+  onQuoteMessage: (message: ChatMessage) => void;
 }
 
 export const MessageList: React.FC<MessageListProps> = ({
@@ -21,7 +22,10 @@ export const MessageList: React.FC<MessageListProps> = ({
   renderContent,
   messagesContainerRef,
   messagesEndRef,
+  onQuoteMessage,
 }) => {
+  // Use a ref to track swipe start X per message
+  const touchStartXRef = React.useRef<{ [id: string]: number }>({});
   return (
     <div className="messages" ref={messagesContainerRef}>
       {messages.map((message) => (
@@ -32,6 +36,28 @@ export const MessageList: React.FC<MessageListProps> = ({
             backgroundColor: isDarkColor(message.color || "#ffffff")
               ? "#808080"
               : undefined,
+          }}
+          onTouchStart={(e) => {
+            touchStartXRef.current[message.id] = e.touches[0].clientX;
+          }}
+          onTouchEnd={(e) => {
+            const startX = touchStartXRef.current[message.id];
+            const endX = e.changedTouches[0].clientX;
+            if (startX !== undefined && endX - startX > 60) {
+              onQuoteMessage(message);
+            }
+            delete touchStartXRef.current[message.id];
+          }}
+          onMouseDown={(e) => {
+            touchStartXRef.current[message.id] = e.clientX;
+          }}
+          onMouseUp={(e) => {
+            const startX = touchStartXRef.current[message.id];
+            const endX = e.clientX;
+            if (startX !== undefined && endX - startX > 60) {
+              onQuoteMessage(message);
+            }
+            delete touchStartXRef.current[message.id];
           }}
         >
           <div className="message-top-row">
@@ -54,19 +80,44 @@ export const MessageList: React.FC<MessageListProps> = ({
               })}
             </span>
           </div>
+          {/* Parse and show quote if present in content */}
+          {message.content.startsWith("::quote::") &&
+            (() => {
+              const endIdx = message.content.indexOf("::endquote::");
+              if (endIdx !== -1) {
+                const quoted = message.content.substring(8, endIdx);
+                return (
+                  <div className="quote-balloon message-quote-balloon">
+                    <span className="quote-content">
+                      {quoted.length > 60 ? quoted.slice(0, 60) + "…" : quoted}
+                    </span>
+                  </div>
+                );
+              }
+              return null;
+            })()}
           <div className="message-bottom-row">
             <span
               className="message-content"
               style={{ color: message.color || "#ffffff" }}
             >
-              {message.messageType === "text"
-                ? renderContent(
-                    message.content.length > 200
-                      ? message.content.slice(0, 200) + "…"
-                      : message.content,
-                    message.messageType,
-                  )
-                : renderContent(message.content, message.messageType)}
+              {(() => {
+                let contentToShow = message.content;
+                if (contentToShow.startsWith("::quote::")) {
+                  const endIdx = contentToShow.indexOf("::endquote::");
+                  if (endIdx !== -1) {
+                    contentToShow = contentToShow.slice(endIdx + 12).trim();
+                  }
+                }
+                return message.messageType === "text"
+                  ? renderContent(
+                      contentToShow.length > 200
+                        ? contentToShow.slice(0, 200) + "…"
+                        : contentToShow,
+                      message.messageType,
+                    )
+                  : renderContent(contentToShow, message.messageType);
+              })()}
             </span>
             {message.user === name && (
               <button

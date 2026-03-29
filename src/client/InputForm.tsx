@@ -13,6 +13,8 @@ interface InputFormProps {
   onClearTag: () => void;
   onMicClick: () => void;
   onImageUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  quotedMessage: ChatMessage | null;
+  onClearQuote: () => void;
 }
 
 export const InputForm: React.FC<InputFormProps> = ({
@@ -26,6 +28,8 @@ export const InputForm: React.FC<InputFormProps> = ({
   onClearTag,
   onMicClick,
   onImageUpload,
+  quotedMessage,
+  onClearQuote,
 }) => {
   return (
     <form
@@ -35,9 +39,14 @@ export const InputForm: React.FC<InputFormProps> = ({
         const content = inputRef.current;
         if (!content || content.value.trim() === "") return;
 
+        let fullContent = content.value;
+        if (quotedMessage) {
+          // Use a delimiter unlikely to appear in normal text
+          fullContent = `::quote::${quotedMessage.content}::endquote::\n${content.value}`;
+        }
         const message: ChatMessage = {
           id: nanoid(8),
-          content: content.value,
+          content: fullContent,
           user: name,
           role: "user",
           timestamp: new Date().toISOString(),
@@ -50,6 +59,23 @@ export const InputForm: React.FC<InputFormProps> = ({
         content.focus();
       }}
     >
+      {quotedMessage && (
+        <div className="quote-balloon">
+          <span className="quote-content">
+            {quotedMessage.content.length > 60
+              ? quotedMessage.content.slice(0, 60) + "…"
+              : quotedMessage.content}
+          </span>
+          <button
+            type="button"
+            className="clear-quote-button"
+            onClick={onClearQuote}
+            title="Discard quote"
+          >
+            ×
+          </button>
+        </div>
+      )}
       <div className="input-row">
         <input
           ref={inputRef}

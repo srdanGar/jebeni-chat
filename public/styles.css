@@ -1,3 +1,44 @@
+/* Quote balloon for quoted messages */
+.quote-balloon {
+  display: flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.08);
+  border-left: 4px solid #4caf50;
+  border-radius: 6px;
+  padding: 6px 10px;
+  margin-bottom: 6px;
+  font-size: 0.95em;
+  color: #b2dfdb;
+  position: relative;
+  max-width: 90%;
+  word-break: break-word;
+}
+.quote-content {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.clear-quote-button {
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 18px;
+  margin-left: 8px;
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+.clear-quote-button:hover {
+  opacity: 1;
+}
+.message-quote-balloon {
+  margin-bottom: 4px;
+  font-size: 0.9em;
+  color: #a5d6a7;
+  background: rgba(255, 255, 255, 0.04);
+  border-left: 4px solid #81c784;
+}
 .message-content audio {
   height: 30px !important;
   min-height: 30px !important;

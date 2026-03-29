@@ -16,6 +16,7 @@ import { useAudioRecording } from "./useAudioRecording";
 
 function App() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [quotedMessage, setQuotedMessage] = useState<ChatMessage | null>(null);
   const room = "9FexDdTqo9kdtdgg0WukK";
 
   const storageKey = `chat:name${room ? ":" + room : ""}`;
@@ -326,6 +327,7 @@ function App() {
   const handleFormSubmit = (message: ChatMessage) => {
     setMessages((messages) => [...messages, message]);
     setTaggedUser("");
+    setQuotedMessage(null);
 
     socket.send(
       JSON.stringify({
@@ -347,6 +349,7 @@ function App() {
           renderContent={renderContent}
           messagesContainerRef={messagesContainerRef}
           messagesEndRef={messagesEndRef}
+          onQuoteMessage={setQuotedMessage}
         />
 
         <InputForm
@@ -360,6 +363,8 @@ function App() {
           onClearTag={() => setTaggedUser("")}
           onMicClick={handleMicClick}
           onImageUpload={handleImageUpload}
+          quotedMessage={quotedMessage}
+          onClearQuote={() => setQuotedMessage(null)}
         />
       </div>
 
