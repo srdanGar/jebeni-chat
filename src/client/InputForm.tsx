@@ -50,59 +50,61 @@ export const InputForm: React.FC<InputFormProps> = ({
         content.focus();
       }}
     >
-      <input
-        ref={inputRef}
-        type="text"
-        className="input-field"
-        placeholder={`Hello ${name}! Type a message...`}
-        autoComplete="off"
-        style={{
-          paddingLeft: taggedUser ? "80px" : "10px",
-        }}
-      />
-      {taggedUser && (
-        <span className="tag-input-badge">
-          @{taggedUser}
-          <button
-            type="button"
-            className="clear-tag-button"
-            onClick={onClearTag}
-          >
-            ×
-          </button>
-        </span>
-      )}
-      <button type="submit" className="send-message">
-        Send
-      </button>
-
-      <button
-        type="button"
-        onClick={onMicClick}
-        className="mic-button"
-        title={isRecording ? "Stop recording" : "Record voice message"}
-        style={{
-          backgroundColor: isRecording ? "red" : undefined,
-        }}
-      >
-        {isRecording ? "⏹️" : "🎤"}
-      </button>
-
-      <button
-        type="button"
-        onClick={() => fileInputRef.current?.click()}
-        className="image-button"
-        title="Upload image"
-      >
-        ➕
-      </button>
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        onChange={onImageUpload}
-        style={{ display: "none" }}
-      />
+      <div className="input-row">
+        <input
+          ref={inputRef}
+          type="text"
+          className="input-field"
+          placeholder={`Hello ${name}! Type a message...`}
+          autoComplete="off"
+          style={{
+            paddingLeft: taggedUser ? "80px" : "10px",
+          }}
+        />
+        {taggedUser && (
+          <span className="tag-input-badge">
+            @{taggedUser}
+            <button
+              type="button"
+              className="clear-tag-button"
+              onClick={onClearTag}
+            >
+              ×
+            </button>
+          </span>
+        )}
+        <button type="submit" className="send-message">
+          Send
+        </button>
+      </div>
+      <div className="button-row">
+        <button
+          type="button"
+          onClick={onMicClick}
+          className="mic-button"
+          title={isRecording ? "Stop recording" : "Record voice message"}
+          style={{
+            backgroundColor: isRecording ? "red" : undefined,
+          }}
+        >
+          {isRecording ? "⏹️" : "🎤"}
+        </button>
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          className="image-button"
+          title="Upload image"
+        >
+          ➕
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={onImageUpload}
+          style={{ display: "none" }}
+        />
+      </div>
     </form>
   );
 };

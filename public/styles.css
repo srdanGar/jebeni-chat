@@ -281,11 +281,26 @@ html {
 /* Form row styles */
 .form-row {
   display: flex;
-  gap: 8px;
+  flex-direction: column;
+  gap: 6px;
   padding: 10px;
   background-color: #1a1a1a;
   border-top: 1px solid #555;
   position: relative;
+}
+
+.input-row {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  align-items: center;
+}
+
+.button-row {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  margin-top: 2px;
 }
 
 .input-field {
