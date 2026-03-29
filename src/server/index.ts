@@ -6,6 +6,40 @@ import {
 } from "partyserver";
 import type { ChatMessage, Message } from "../shared";
 
+// Helper: Call Cloudflare Workers AI
+async function fetchAIResponse(
+  accountId: string,
+  prompt: string,
+  env: any,
+): Promise<string> {
+  // You may want to use a secret for the API token
+  const apiToken = "cfut_IErGCy6EfoBqQPx8auOnXoZKlBcAlOGhJ1JlUShC2618808f";
+  if (!apiToken) throw new Error("Missing Cloudflare API token in env");
+  const model = "@cf/meta/llama-2-7b-chat-int8";
+  const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${model}`;
+  const body = JSON.stringify({
+    messages: [
+      {
+        role: "system",
+        content: "You are a helpful assistant in a group chat.",
+      },
+      { role: "user", content: prompt },
+    ],
+  });
+  const resp = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiToken}`,
+      "Content-Type": "application/json",
+    },
+    body,
+  });
+  if (!resp.ok) throw new Error("AI API error: " + resp.status);
+  const data = await resp.json();
+  // Cloudflare AI returns { result: { response: string } }
+  return data.result?.response || "(no response)";
+}
+
 const esc = (s: string) => s.replace(/'/g, "''");
 
 export class Chat extends Server<Env> {
@@ -105,6 +139,21 @@ export class Chat extends Server<Env> {
       return;
     }
 
+    let aiTriggered = false;
+    let aiPrompt = "";
+    if (
+      (parsed.type === "add" || parsed.type === "update") &&
+      typeof parsed.content === "string"
+    ) {
+      // Detect @ai tag (case-insensitive, word-boundary)
+      const aiMatch = parsed.content.match(/@ai\b/i);
+      if (aiMatch) {
+        aiTriggered = true;
+        // Remove @ai from prompt for clarity
+        aiPrompt = parsed.content.replace(/@ai\b/i, "").trim();
+      }
+    }
+
     if (parsed.type === "add" || parsed.type === "update") {
       let messageType: "text" | "audio" | "image" = "text";
 
@@ -140,6 +189,35 @@ export class Chat extends Server<Env> {
     }
 
     this.broadcast(message);
+
+    // If @ai was tagged, call Cloudflare Workers AI and broadcast bot response
+    if (aiTriggered && aiPrompt) {
+      try {
+        const aiText = await fetchAIResponse(
+          "272fc77dbd61d67eb55d76b3e2bdbfde",
+          aiPrompt,
+          this.ctx.env,
+        );
+        const botMessage: ChatMessage = {
+          id: "ai-" + Date.now() + Math.floor(Math.random() * 10000),
+          content: aiText,
+          user: "AI",
+          role: "assistant",
+          timestamp: new Date().toISOString(),
+          color: "#4caf50",
+          messageType: "text",
+        };
+        this.saveMessage(botMessage);
+        this.broadcast(
+          JSON.stringify({
+            type: "add",
+            ...botMessage,
+          }),
+        );
+      } catch (err) {
+        console.error("AI error:", err);
+      }
+    }
   }
 
   async onFetch(request: Request) {
