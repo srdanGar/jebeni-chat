@@ -109,11 +109,16 @@ export const MessageList: React.FC<MessageListProps> = ({
                     contentToShow = contentToShow.slice(endIdx + 12).trim();
                   }
                 }
+                // Do not shorten AI bot messages
+                const isBot =
+                  message.user === "AI" || message.role === "assistant";
                 return message.messageType === "text"
                   ? renderContent(
-                      contentToShow.length > 200
-                        ? contentToShow.slice(0, 200) + "…"
-                        : contentToShow,
+                      isBot
+                        ? contentToShow
+                        : contentToShow.length > 200
+                          ? contentToShow.slice(0, 200) + "…"
+                          : contentToShow,
                       message.messageType,
                     )
                   : renderContent(contentToShow, message.messageType);

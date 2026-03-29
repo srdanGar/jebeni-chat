@@ -145,12 +145,12 @@ export class Chat extends Server<Env> {
       (parsed.type === "add" || parsed.type === "update") &&
       typeof parsed.content === "string"
     ) {
-      // Detect @ai tag (case-insensitive, word-boundary)
-      const aiMatch = parsed.content.match(/@ai\b/i);
+      // Detect @ai or @AI (case-insensitive, word-boundary)
+      const aiMatch = parsed.content.match(/@ai\b/gi);
       if (aiMatch) {
         aiTriggered = true;
-        // Remove @ai from prompt for clarity
-        aiPrompt = parsed.content.replace(/@ai\b/i, "").trim();
+        // Remove all @ai (case-insensitive, word-boundary) from prompt for clarity
+        aiPrompt = parsed.content.replace(/@ai\b/gi, "").trim();
       }
     }
 
