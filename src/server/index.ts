@@ -138,7 +138,10 @@ export class Chat extends Server<Env> {
       // Detect @ai or @AI (case-insensitive, word-boundary)
       const aiMatch = parsed.content.match(/@ai\b/gi);
       // Also trigger if taggedUser is 'AI' (case-insensitive)
-      const aiTagged = parsed.taggedUser && typeof parsed.taggedUser === "string" && parsed.taggedUser.trim().toLowerCase() === "ai";
+      const aiTagged =
+        parsed.taggedUser &&
+        typeof parsed.taggedUser === "string" &&
+        parsed.taggedUser.trim().toLowerCase() === "ai";
       if (aiMatch || aiTagged) {
         aiTriggered = true;
         // Remove all @ai (case-insensitive, word-boundary) from prompt for clarity
