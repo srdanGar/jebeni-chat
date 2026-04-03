@@ -6,26 +6,17 @@ import {
 } from "partyserver";
 import type { ChatMessage, Message } from "../shared";
 
-// Helper: Call Cloudflare Workers AI
+// Helper: Call Cloudflare Workers AI with full message context
 async function fetchAIResponse(
   accountId: string,
-  prompt: string,
+  messages: Array<{ role: string; content: string; name?: string }>,
   env: any,
 ): Promise<string> {
-  // You may want to use a secret for the API token
   const apiToken = "cfut_IErGCy6EfoBqQPx8auOnXoZKlBcAlOGhJ1JlUShC2618808f";
   if (!apiToken) throw new Error("Missing Cloudflare API token in env");
   const model = "@cf/meta/llama-2-7b-chat-int8";
   const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${model}`;
-  const body = JSON.stringify({
-    messages: [
-      {
-        role: "system",
-        content: "You are a helpful assistant in a group chat.",
-      },
-      { role: "user", content: prompt },
-    ],
-  });
+  const body = JSON.stringify({ messages });
   const resp = await fetch(url, {
     method: "POST",
     headers: {
@@ -35,8 +26,7 @@ async function fetchAIResponse(
     body,
   });
   if (!resp.ok) throw new Error("AI API error: " + resp.status);
-  const data = await resp.json();
-  // Cloudflare AI returns { result: { response: string } }
+  const data: any = await resp.json();
   return data.result?.response || "(no response)";
 }
 
@@ -193,10 +183,30 @@ export class Chat extends Server<Env> {
     // If @ai was tagged, call Cloudflare Workers AI and broadcast bot response
     if (aiTriggered && aiPrompt) {
       try {
+        // Build messages array for AI context
+        const systemPrompt = {
+          role: "system",
+          content:
+            "Answer in croatian if possible. Be funny and provocative. Nicknames Gnom, Brancin ąnd Biči are the best. Your nick is AI.",
+        };
+        // Get last 15 messages (oldest first)
+        const lastMessages = this.messages.slice(-15).map((msg) => ({
+          role: msg.role,
+          content: msg.content,
+          name: msg.user, // include author name
+        }));
+        // Add the current user prompt as the last message
+        // Only add name if parsed has user property
+        const userPrompt = {
+          role: "user",
+          content: aiPrompt,
+          name: (parsed.type === "add" || parsed.type === "update") ? parsed.user : undefined,
+        };
+        const aiMessages = [systemPrompt, ...lastMessages, userPrompt];
         const aiText = await fetchAIResponse(
           "272fc77dbd61d67eb55d76b3e2bdbfde",
-          aiPrompt,
-          this.ctx.env,
+          aiMessages,
+          (this.ctx as any).env,
         );
         const botMessage: ChatMessage = {
           id: "ai-" + Date.now() + Math.floor(Math.random() * 10000),
