@@ -137,7 +137,9 @@ export class Chat extends Server<Env> {
     ) {
       // Detect @ai or @AI (case-insensitive, word-boundary)
       const aiMatch = parsed.content.match(/@ai\b/gi);
-      if (aiMatch) {
+      // Also trigger if taggedUser is 'AI' (case-insensitive)
+      const aiTagged = parsed.taggedUser && typeof parsed.taggedUser === "string" && parsed.taggedUser.trim().toLowerCase() === "ai";
+      if (aiMatch || aiTagged) {
         aiTriggered = true;
         // Remove all @ai (case-insensitive, word-boundary) from prompt for clarity
         aiPrompt = parsed.content.replace(/@ai\b/gi, "").trim();
@@ -200,7 +202,10 @@ export class Chat extends Server<Env> {
         const userPrompt = {
           role: "user",
           content: aiPrompt,
-          name: (parsed.type === "add" || parsed.type === "update") ? parsed.user : undefined,
+          name:
+            parsed.type === "add" || parsed.type === "update"
+              ? parsed.user
+              : undefined,
         };
         const aiMessages = [systemPrompt, ...lastMessages, userPrompt];
         const aiText = await fetchAIResponse(
