@@ -12,9 +12,9 @@ async function fetchAIResponse(
   messages: Array<{ role: string; content: string; name?: string }>,
   env: any,
 ): Promise<string> {
-  const apiToken = "cfut_IErGCy6EfoBqQPx8auOnXoZKlBcAlOGhJ1JlUShC2618808f";
+  const apiToken = "cfut_EFK75ozNeo1AReM0UkOmfoXMpGmv6wnhCsqU5wEi5c7625da";
   if (!apiToken) throw new Error("Missing Cloudflare API token in env");
-  const model = "@cf/meta/llama-2-7b-chat-int8";
+  const model = "@cf/meta/llama-3.1-8b-instruct-fast";
   const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${model}`;
   const body = JSON.stringify({ messages });
   const resp = await fetch(url, {
