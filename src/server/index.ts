@@ -211,10 +211,11 @@ export class Chat extends Server<Env> {
               : undefined,
         };
         const aiMessages = [systemPrompt, ...lastMessages, userPrompt];
+
         const aiText = await fetchAIResponse(
           "272fc77dbd61d67eb55d76b3e2bdbfde",
           aiMessages,
-          (this.ctx as any).env,
+          this.env,
         );
         const botMessage: ChatMessage = {
           id: "ai-" + Date.now() + Math.floor(Math.random() * 10000),
