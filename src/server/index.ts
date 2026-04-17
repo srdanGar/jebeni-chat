@@ -15,7 +15,7 @@ async function fetchAIResponse(
   const apiToken = env.AI_API_TOKEN;
   if (!apiToken)
     throw new Error("Missing Cloudflare API token in env.AI_API_TOKEN");
-  const model = "@cf/meta/llama-2-7b-chat-int8";
+  const model = "@cf/meta/llama-3.1-8b-instruct-fast";
   const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${model}`;
   const body = JSON.stringify({ messages });
   const resp = await fetch(url, {
