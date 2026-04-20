@@ -72,9 +72,11 @@ export class Chat extends Server<Env> {
     this.messages = this.ctx.storage.sql
       .exec(
         `SELECT id, user, role, content, timestamp, color, messageType, taggedUser
-         FROM messages ORDER BY timestamp ASC`,
+         FROM messages ORDER BY timestamp DESC LIMIT 150`,
       )
       .toArray() as ChatMessage[];
+    // Reverse to oldest-first for UI
+    this.messages.reverse();
   }
 
   onConnect(connection: Connection) {
