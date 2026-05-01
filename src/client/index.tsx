@@ -1,7 +1,13 @@
 import { createRoot } from "react-dom/client";
 import { usePartySocket } from "partysocket/react";
 import React, { useState, useEffect, useRef } from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+  useLocation,
+} from "react-router";
 import { nanoid } from "nanoid";
 
 import { names, type ChatMessage, type Message } from "../shared";
@@ -472,13 +478,24 @@ function App() {
   );
 }
 
+function CatchAll() {
+  const location = useLocation();
+
+  // Don't redirect for API endpoints
+  if (location.pathname === "/deleteOld") {
+    return null; // Let the server handle it
+  }
+
+  return <Navigate to="/9FexDdTqo9kdtdgg0WukK" />;
+}
+
 // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
 createRoot(document.getElementById("root")!).render(
   <BrowserRouter>
     <Routes>
       <Route path="/" element={<Navigate to="/9FexDdTqo9kdtdgg0WukK" />} />
       <Route path="/9FexDdTqo9kdtdgg0WukK" element={<App />} />
-      <Route path="*" element={<Navigate to="/9FexDdTqo9kdtdgg0WukK" />} />
+      <Route path="*" element={<CatchAll />} />
     </Routes>
   </BrowserRouter>,
 );

@@ -4,7 +4,11 @@ import {
   type WSMessage,
   routePartykitRequest,
 } from "partyserver";
+import { createAdminClient } from "../supabase-service";
 import type { ChatMessage, Message } from "../shared";
+
+const PARTYSERVER_NAMESPACE = "chat";
+const DEFAULT_ROOM = "9FexDdTqo9kdtdgg0WukK";
 
 // Helper: Call Cloudflare Workers AI with full message context
 async function fetchAIResponse(
@@ -32,9 +36,43 @@ async function fetchAIResponse(
 
 const esc = (s: string) => s.replace(/'/g, "''");
 
+async function handleDeleteOld(request: Request, env: Env) {
+  const url = new URL(request.url);
+  const hoursParam = url.searchParams.get("hours");
+  const hours = hoursParam ? Number(hoursParam) : NaN;
+
+  if (!Number.isInteger(hours) || hours < 1 || hours > 24) {
+    return new Response(
+      JSON.stringify({
+        error: "hours query parameter must be an integer between 1 and 24",
+      }),
+      {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
+  }
+
+  // Get the Chat DurableObject instance
+  const chatNamespace = env.Chat;
+  const id = chatNamespace.idFromName(DEFAULT_ROOM);
+  const chatStub = chatNamespace.get(id);
+
+  // Call the deleteOldMessages method on the DO
+  const response = await chatStub.fetch(
+    new Request(`http://internal/deleteOld?hours=${hours}`),
+  );
+  return response;
+}
+
 export class Chat extends Server<Env> {
   static options = { hibernate: true };
   messages: ChatMessage[] = [];
+
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env);
+    console.log("Chat instance created");
+  }
 
   async onStart() {
     this.ctx.storage.sql.exec(
@@ -117,6 +155,69 @@ export class Chat extends Server<Env> {
     this.ctx.storage.sql.exec(
       `DELETE FROM messages WHERE id = '${esc(messageId)}'`,
     );
+  }
+
+  private getSupabaseAdminClient() {
+    return createAdminClient(this.env.SUPABASE_SERVICE_ROLE_KEY);
+  }
+
+  private parseStorageFilePath(content: string): string | null {
+    try {
+      const url = new URL(content);
+      const path = url.pathname;
+      const match = path.match(/\/(audio|images)\/(.+)$/);
+      if (match) {
+        return `${match[1]}/${match[2]}`;
+      }
+      const altMatch = path.match(
+        /\/storage\/v1\/object\/public\/chat\/(audio|images)\/(.+)$/,
+      );
+      if (altMatch) {
+        return `${altMatch[1]}/${altMatch[2]}`;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  private async deleteSupabaseMedia(message: ChatMessage) {
+    if (message.messageType !== "audio" && message.messageType !== "image") {
+      return;
+    }
+
+    const filePath = this.parseStorageFilePath(message.content);
+    if (!filePath) {
+      return;
+    }
+
+    const supabase = this.getSupabaseAdminClient();
+    try {
+      const { error } = await supabase.storage.from("chat").remove([filePath]);
+      if (error) {
+        console.error(`Supabase remove error for ${filePath}:`, error);
+      }
+    } catch (err) {
+      console.error(`Supabase remove failed for ${filePath}:`, err);
+    }
+  }
+
+  async deleteOldMessages(hours: number) {
+    const cutoff = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
+    const messagesToDelete = this.ctx.storage.sql
+      .exec(
+        `SELECT id, user, role, content, timestamp, color, messageType, taggedUser
+         FROM messages
+         WHERE timestamp < '${esc(cutoff)}'`,
+      )
+      .toArray() as ChatMessage[];
+
+    for (const message of messagesToDelete) {
+      await this.deleteSupabaseMedia(message);
+      this.deleteMessage(message.id);
+    }
+
+    return messagesToDelete.length;
   }
 
   async onMessage(_: Connection, message: WSMessage) {
@@ -241,8 +342,38 @@ export class Chat extends Server<Env> {
     }
   }
 
-  async onFetch(request: Request) {
+  async onRequest(request: Request) {
     const url = new URL(request.url);
+    console.log(`Chat.onRequest called with pathname: ${url.pathname}`);
+
+    if (url.pathname === "/deleteOld" || url.pathname.endsWith("/deleteOld")) {
+      console.log(
+        `Processing deleteOld request with hours: ${url.searchParams.get("hours")}`,
+      );
+      const hoursParam = url.searchParams.get("hours");
+      const hours = hoursParam ? Number(hoursParam) : NaN;
+
+      if (!Number.isInteger(hours) || hours < 1 || hours > 24) {
+        console.log(`Invalid hours parameter: ${hoursParam}`);
+        return new Response(
+          JSON.stringify({
+            error: "hours query parameter must be an integer between 1 and 24",
+          }),
+          {
+            status: 400,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      }
+
+      console.log(`Deleting messages older than ${hours} hours`);
+      const deleted = await this.deleteOldMessages(hours);
+      console.log(`Deleted ${deleted} messages`);
+      return new Response(JSON.stringify({ deleted }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
 
     if (url.pathname.startsWith("/audio/")) {
       const audioId = url.pathname.slice(7).split(".")[0];
@@ -284,6 +415,12 @@ export class Chat extends Server<Env> {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    console.log(`Main fetch called for: ${url.pathname}`);
+
+    if (url.pathname === "/deleteOld") {
+      console.log("Handling /deleteOld in main fetch");
+      return await handleDeleteOld(request, env);
+    }
 
     if (url.pathname.startsWith("/audio/")) {
       return (await routePartykitRequest(request, { ...env })) as any;
