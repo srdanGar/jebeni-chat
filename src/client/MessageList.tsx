@@ -11,6 +11,7 @@ interface MessageListProps {
   messagesContainerRef: React.RefObject<HTMLDivElement>;
   messagesEndRef: React.RefObject<HTMLDivElement>;
   onQuoteMessage: (message: ChatMessage) => void;
+  onLongPressIgnore: (user: string) => void;
 }
 
 export const MessageList: React.FC<MessageListProps> = ({
@@ -23,9 +24,30 @@ export const MessageList: React.FC<MessageListProps> = ({
   messagesContainerRef,
   messagesEndRef,
   onQuoteMessage,
+  onLongPressIgnore,
 }) => {
   // Use a ref to track swipe start X per message
   const touchStartXRef = React.useRef<{ [id: string]: number }>({});
+  // Long-press logic for ignore
+  // Use number for browser setTimeout
+  const longPressTimeout = React.useRef<{ [id: string]: number }>({});
+  const [ignorePrompt, setIgnorePrompt] = React.useState<{
+    user: string;
+    x: number;
+    y: number;
+  } | null>(null);
+
+  const handleLongPress = (user: string, x: number, y: number) => {
+    setIgnorePrompt({ user, x, y });
+  };
+
+  const handlePrompt = (yes: boolean) => {
+    if (ignorePrompt && yes) {
+      onLongPressIgnore(ignorePrompt.user);
+    }
+    setIgnorePrompt(null);
+  };
+
   return (
     <div className="messages" ref={messagesContainerRef}>
       {messages.map((message) => (
@@ -38,9 +60,16 @@ export const MessageList: React.FC<MessageListProps> = ({
               : undefined,
           }}
           onTouchStart={(e) => {
-            touchStartXRef.current[message.id] = e.touches[0].clientX;
+            longPressTimeout.current[message.id] = setTimeout(() => {
+              handleLongPress(
+                message.user,
+                e.touches[0].clientX,
+                e.touches[0].clientY,
+              );
+            }, 800);
           }}
           onTouchEnd={(e) => {
+            clearTimeout(longPressTimeout.current[message.id]);
             const startX = touchStartXRef.current[message.id];
             const endX = e.changedTouches[0].clientX;
             if (startX !== undefined && endX - startX > 60) {
@@ -48,16 +77,26 @@ export const MessageList: React.FC<MessageListProps> = ({
             }
             delete touchStartXRef.current[message.id];
           }}
+          onTouchMove={() => {
+            clearTimeout(longPressTimeout.current[message.id]);
+          }}
           onMouseDown={(e) => {
+            longPressTimeout.current[message.id] = setTimeout(() => {
+              handleLongPress(message.user, e.clientX, e.clientY);
+            }, 800);
             touchStartXRef.current[message.id] = e.clientX;
           }}
           onMouseUp={(e) => {
+            clearTimeout(longPressTimeout.current[message.id]);
             const startX = touchStartXRef.current[message.id];
             const endX = e.clientX;
             if (startX !== undefined && endX - startX > 60) {
               onQuoteMessage(message);
             }
             delete touchStartXRef.current[message.id];
+          }}
+          onMouseLeave={() => {
+            clearTimeout(longPressTimeout.current[message.id]);
           }}
         >
           <div className="message-top-row">
@@ -137,6 +176,31 @@ export const MessageList: React.FC<MessageListProps> = ({
         </div>
       ))}
       <div ref={messagesEndRef} />
+      {ignorePrompt && (
+        <div
+          className="ignore-prompt"
+          style={{
+            position: "fixed",
+            left: ignorePrompt.x,
+            top: ignorePrompt.y,
+            zIndex: 2000,
+            background: "#222",
+            color: "#fff",
+            border: "1px solid #888",
+            borderRadius: 8,
+            padding: 16,
+            boxShadow: "0 2px 8px #000a",
+          }}
+        >
+          Ignore <b>{ignorePrompt.user}</b>?<br />
+          <button onClick={() => handlePrompt(true)} style={{ margin: 8 }}>
+            Yes
+          </button>
+          <button onClick={() => handlePrompt(false)} style={{ margin: 8 }}>
+            No
+          </button>
+        </div>
+      )}
     </div>
   );
 };

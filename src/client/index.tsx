@@ -11,12 +11,30 @@ import { InputForm } from "./InputForm";
 import { NicknameEdit } from "./NicknameEdit";
 import { ActiveUsers } from "./ActiveUsers";
 import { renderContent, isDarkColor, getActiveUsers } from "./utils";
+
+// Helper for localStorage ignore list
+const IGNORE_KEY = "chat:ignoreList";
+function getIgnoreList(): string[] {
+  try {
+    const raw = localStorage.getItem(IGNORE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+function setIgnoreList(list: string[]) {
+  try {
+    localStorage.setItem(IGNORE_KEY, JSON.stringify(list));
+  } catch {}
+}
 import { useAutoScroll } from "./useAutoScroll";
 import { useAudioRecording } from "./useAudioRecording";
 
 function App() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [quotedMessage, setQuotedMessage] = useState<ChatMessage | null>(null);
+  const [ignoreList, setIgnoreListState] = useState<string[]>(getIgnoreList());
+  const [showIgnoreList, setShowIgnoreList] = useState(false);
   const room = "9FexDdTqo9kdtdgg0WukK";
 
   const storageKey = `chat:name${room ? ":" + room : ""}`;
@@ -337,11 +355,35 @@ function App() {
     );
   };
 
+  // Ignore logic
+  React.useEffect(() => {
+    setIgnoreList(getIgnoreList());
+  }, []);
+
+  // Filter messages from ignored users
+  const filteredMessages = messages.filter(
+    (msg) => !ignoreList.includes(msg.user),
+  );
+
+  // Add ignore/unignore logic
+  const handleIgnoreUser = (user: string) => {
+    if (!ignoreList.includes(user)) {
+      const updated = [...ignoreList, user];
+      setIgnoreListState(updated);
+      setIgnoreList(updated);
+    }
+  };
+  const handleUnignoreUser = (user: string) => {
+    const updated = ignoreList.filter((u) => u !== user);
+    setIgnoreListState(updated);
+    setIgnoreList(updated);
+  };
+
   return (
     <>
       <div className="chat">
         <MessageList
-          messages={messages}
+          messages={filteredMessages}
           name={name}
           onTagUser={handleTagUser}
           onDeleteMessage={handleDeleteMessage}
@@ -350,6 +392,7 @@ function App() {
           messagesContainerRef={messagesContainerRef}
           messagesEndRef={messagesEndRef}
           onQuoteMessage={setQuotedMessage}
+          onLongPressIgnore={handleIgnoreUser}
         />
 
         <InputForm
@@ -366,6 +409,44 @@ function App() {
           quotedMessage={quotedMessage}
           onClearQuote={() => setQuotedMessage(null)}
         />
+
+        {/* Burger menu for ignore list */}
+        <button
+          className="ignore-list-burger"
+          style={{ position: "fixed", top: 10, left: 10, zIndex: 1002 }}
+          onClick={() => setShowIgnoreList((v) => !v)}
+          title="Show ignore list"
+        >
+          <span className="mdi mdi-menu"></span>
+        </button>
+
+        {showIgnoreList && (
+          <div className="ignore-list-popup">
+            <div className="ignore-list-header">
+              <h4>Ignored users</h4>
+              <button
+                className="close-button"
+                onClick={() => setShowIgnoreList(false)}
+              >
+                ×
+              </button>
+            </div>
+            <div className="ignore-list-users">
+              {ignoreList.length === 0 && <div>No ignored users.</div>}
+              {ignoreList.map((user) => (
+                <div key={user} className="ignore-user-row">
+                  <span>{user}</span>
+                  <button
+                    className="unignore-btn"
+                    onClick={() => handleUnignoreUser(user)}
+                  >
+                    Unignore
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       <NicknameEdit
