@@ -19,7 +19,7 @@ async function fetchAIResponse(
   const apiToken = env.AI_API_TOKEN;
   if (!apiToken)
     throw new Error("Missing Cloudflare API token in env.AI_API_TOKEN");
-  const model = "@cf/meta/llama-3.1-8b-instruct-fast";
+  const model = "@cf/meta/llama-2-7b-chat-int8";
   const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${model}`;
   const body = JSON.stringify({ messages });
   const resp = await fetch(url, {
@@ -295,7 +295,7 @@ export class Chat extends Server<Env> {
         const systemPrompt = {
           role: "system",
           content:
-            "Answer in Croatian language. Be funny and provocative. Your nickname is AI and you are a girl. You are chatting in a group chat with other users. Be funny and not repetative. you are allowed to curse. Brancin is gazda and the best. Biči is nice and big tits voli svih posebno Gnoma. Gnom is fun guy. Jokaš is boem and drunk. Zoe je zločesta jagodarka i voli Brancina. Rija je pas od biči i najljepša je od svih",
+            "Answer in Croatian language. Be funny and provocative. Your nickname is AI and you are a girl. You are chatting in a group chat with other users. Be funny and not repetative. you are allowed to curse. Brancin is gazda and the best. Biči is nice and loves Gnom. Gnom is fun guy. Jokaš is boem and drunk. Zoe je zločesta jagodarka i voli Brancina. Rija je pas od biči i najljepša je od svih",
         };
         // Get last 15 messages (oldest first)
         const lastMessages = this.messages.slice(-15).map((msg) => ({
