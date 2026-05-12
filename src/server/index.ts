@@ -14,7 +14,9 @@ import type {
 
 const DEFAULT_ROOM = "9FexDdTqo9kdtdgg0WukK";
 const MAX_MESSAGES = 150;
-const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30;
+const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 365;
+const SESSION_COOKIE_NAME = "chat_session";
+const SESSION_COOKIE_MAX_AGE_SECONDS = Math.floor(SESSION_TTL_MS / 1000);
 
 type StoredUser = RegisteredUser & {
   passwordHash: string;
@@ -47,6 +49,11 @@ type ConnectionIdentityState = {
 };
 
 type AuthResponseBody = {
+  token: string;
+  user: RegisteredUser;
+};
+
+type MeResponseBody = {
   token: string;
   user: RegisteredUser;
 };
@@ -89,10 +96,81 @@ const jsonResponse = (body: JsonObject, status = 200) =>
     headers: { "Content-Type": "application/json" },
   });
 
+const jsonResponseWithHeaders = (
+  body: JsonObject,
+  status = 200,
+  extraHeaders?: HeadersInit,
+) => {
+  const headers = new Headers(extraHeaders);
+  headers.set("Content-Type", "application/json");
+  return new Response(JSON.stringify(body), {
+    status,
+    headers,
+  });
+};
+
 const toBooleanFlag = (value?: string) =>
   !["0", "false", "no", "off"].includes((value || "").trim().toLowerCase());
 
 const normalizeEmail = (value: string) => value.trim().toLowerCase();
+
+const parseCookies = (cookieHeader: string | null) => {
+  const cookies = new Map<string, string>();
+  if (!cookieHeader) {
+    return cookies;
+  }
+
+  for (const part of cookieHeader.split(";")) {
+    const separatorIndex = part.indexOf("=");
+    if (separatorIndex === -1) {
+      continue;
+    }
+
+    const key = part.slice(0, separatorIndex).trim();
+    const value = part.slice(separatorIndex + 1).trim();
+    if (!key) {
+      continue;
+    }
+
+    cookies.set(key, decodeURIComponent(value));
+  }
+
+  return cookies;
+};
+
+const buildSessionCookie = (token: string, request: Request) => {
+  const isSecure = new URL(request.url).protocol === "https:";
+  const parts = [
+    `${SESSION_COOKIE_NAME}=${encodeURIComponent(token)}`,
+    "Path=/",
+    `Max-Age=${SESSION_COOKIE_MAX_AGE_SECONDS}`,
+    "HttpOnly",
+    "SameSite=Lax",
+  ];
+
+  if (isSecure) {
+    parts.push("Secure");
+  }
+
+  return parts.join("; ");
+};
+
+const buildExpiredSessionCookie = (request: Request) => {
+  const isSecure = new URL(request.url).protocol === "https:";
+  const parts = [
+    `${SESSION_COOKIE_NAME}=`,
+    "Path=/",
+    "Max-Age=0",
+    "HttpOnly",
+    "SameSite=Lax",
+  ];
+
+  if (isSecure) {
+    parts.push("Secure");
+  }
+
+  return parts.join("; ");
+};
 
 const cleanNickname = (value: string) =>
   value.trim().replace(/\s+/g, " ").slice(0, 24);
@@ -132,6 +210,10 @@ const toRegisteredUser = (user: StoredUser): RegisteredUser => ({
   role: user.role,
   bannedAt: user.bannedAt || null,
 });
+
+const hasPasswordCredentials = (
+  user: Pick<StoredUser, "passwordHash" | "passwordSalt">,
+) => Boolean(user.passwordHash && user.passwordSalt);
 
 const hex = (bytes: Uint8Array) =>
   Array.from(bytes)
@@ -272,8 +354,15 @@ export class Chat extends Server<Env> {
       `ALTER TABLE messages ADD COLUMN authorId TEXT`,
       `ALTER TABLE messages ADD COLUMN authorRole TEXT DEFAULT 'guest'`,
       `ALTER TABLE messages ADD COLUMN isRegistered INTEGER DEFAULT 0`,
+      `ALTER TABLE users ADD COLUMN passwordHash TEXT`,
+      `ALTER TABLE users ADD COLUMN passwordSalt TEXT`,
+      `ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'member'`,
+      `ALTER TABLE users ADD COLUMN createdAt TEXT`,
       `ALTER TABLE users ADD COLUMN bannedAt TEXT`,
       `ALTER TABLE users ADD COLUMN updatedAt TEXT`,
+      `ALTER TABLE sessions ADD COLUMN userId TEXT`,
+      `ALTER TABLE sessions ADD COLUMN createdAt TEXT`,
+      `ALTER TABLE sessions ADD COLUMN expiresAt TEXT`,
     ];
 
     for (const statement of alterStatements) {
@@ -323,7 +412,11 @@ export class Chat extends Server<Env> {
     if (authHeader.toLowerCase().startsWith("bearer ")) {
       return authHeader.slice(7).trim();
     }
-    return request.headers.get("x-auth-token") || "";
+    const headerToken = request.headers.get("x-auth-token") || "";
+    if (headerToken) {
+      return headerToken;
+    }
+    return parseCookies(request.headers.get("Cookie")).get(SESSION_COOKIE_NAME) || "";
   }
 
   private getSupabaseAdminClient() {
@@ -410,6 +503,31 @@ export class Chat extends Server<Env> {
     return token;
   }
 
+  private touchSession(token: string) {
+    const expiresAt = new Date(Date.now() + SESSION_TTL_MS).toISOString();
+    this.ctx.storage.sql.exec(
+      `UPDATE sessions
+       SET expiresAt = '${esc(expiresAt)}'
+       WHERE token = '${esc(token)}'`,
+    );
+    return expiresAt;
+  }
+
+  private createSessionResponse(
+    request: Request,
+    token: string,
+    user: StoredUser,
+    status = 200,
+  ) {
+    return jsonResponseWithHeaders(
+      { token, user: toRegisteredUser(user) } satisfies AuthResponseBody,
+      status,
+      {
+        "Set-Cookie": buildSessionCookie(token, request),
+      },
+    );
+  }
+
   private async requireSession(token: string) {
     if (!token) {
       return null;
@@ -431,7 +549,14 @@ export class Chat extends Server<Env> {
       return null;
     }
 
-    return { session, user };
+    const expiresAt = this.touchSession(token);
+    return {
+      session: {
+        ...session,
+        expiresAt,
+      },
+      user,
+    };
   }
 
   private async resolveActor(authToken?: string, fallbackName?: string) {
@@ -667,7 +792,7 @@ export class Chat extends Server<Env> {
     }
 
     const token = await this.createSession(id);
-    return jsonResponse({ token, user: toRegisteredUser(user) } satisfies AuthResponseBody);
+    return this.createSessionResponse(request, token, user);
   }
 
   private async handleLogin(request: Request) {
@@ -680,6 +805,20 @@ export class Chat extends Server<Env> {
       return jsonResponse({ error: "Invalid email or password." }, 401);
     }
 
+    if (!hasPasswordCredentials(user)) {
+      console.error("Login failed: user record is missing password credentials", {
+        email,
+        userId: user.id,
+      });
+      return jsonResponse(
+        {
+          error:
+            "This account is missing password credentials. Please register again or contact the admin.",
+        },
+        500,
+      );
+    }
+
     const passwordHash = await hashPassword(password, user.passwordSalt);
     if (passwordHash !== user.passwordHash) {
       return jsonResponse({ error: "Invalid email or password." }, 401);
@@ -690,7 +829,7 @@ export class Chat extends Server<Env> {
     }
 
     const token = await this.createSession(user.id);
-    return jsonResponse({ token, user: toRegisteredUser(user) } satisfies AuthResponseBody);
+    return this.createSessionResponse(request, token, user);
   }
 
   private async handleLogout(request: Request) {
@@ -698,20 +837,39 @@ export class Chat extends Server<Env> {
     if (token) {
       this.deleteSession(token);
     }
-    return jsonResponse({ ok: true });
+    return jsonResponseWithHeaders(
+      { ok: true },
+      200,
+      { "Set-Cookie": buildExpiredSessionCookie(request) },
+    );
   }
 
   private async handleMe(request: Request) {
     const token = this.getAuthTokenFromRequest(request);
     const sessionState = await this.requireSession(token);
     if (!sessionState) {
-      return jsonResponse({ error: "Not authenticated." }, 401);
+      return jsonResponseWithHeaders(
+        { error: "Not authenticated." },
+        401,
+        { "Set-Cookie": buildExpiredSessionCookie(request) },
+      );
     }
     if (sessionState.user.bannedAt) {
       this.deleteSession(token);
-      return jsonResponse({ error: "This account has been banned." }, 403);
+      return jsonResponseWithHeaders(
+        { error: "This account has been banned." },
+        403,
+        { "Set-Cookie": buildExpiredSessionCookie(request) },
+      );
     }
-    return jsonResponse({ user: toRegisteredUser(sessionState.user) });
+    return jsonResponseWithHeaders(
+      {
+        token,
+        user: toRegisteredUser(sessionState.user),
+      } satisfies MeResponseBody,
+      200,
+      { "Set-Cookie": buildSessionCookie(token, request) },
+    );
   }
 
   private async handleProfile(request: Request) {
@@ -744,7 +902,11 @@ export class Chat extends Server<Env> {
       return jsonResponse({ error: "Failed to update profile." }, 500);
     }
 
-    return jsonResponse({ user: toRegisteredUser(updatedUser) });
+    return jsonResponseWithHeaders(
+      { user: toRegisteredUser(updatedUser) },
+      200,
+      { "Set-Cookie": buildSessionCookie(token, request) },
+    );
   }
 
   private async handleNicknameCheck(request: Request) {

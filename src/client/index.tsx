@@ -41,6 +41,7 @@ type AuthResponse = {
 };
 
 type MeResponse = {
+  token: string;
   user: RegisteredUser;
 };
 
@@ -81,6 +82,7 @@ async function apiRequest<T>(
   }
 
   const response = await fetch(path, {
+    credentials: "same-origin",
     method: options.method || "GET",
     headers,
     body: options.body ? JSON.stringify(options.body) : undefined,
@@ -117,7 +119,6 @@ function App() {
   const room = "9FexDdTqo9kdtdgg0WukK";
   const storageKey = `chat:name:${room}`;
   const colorStorageKey = `chat:color:${room}`;
-  const authStorageKey = `chat:auth:${room}`;
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [quotedMessage, setQuotedMessage] = useState<ChatMessage | null>(null);
@@ -149,16 +150,10 @@ function App() {
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
   const [registerNickname, setRegisterNickname] = useState(name);
-  const [authToken, setAuthToken] = useState(() => {
-    try {
-      return localStorage.getItem(authStorageKey) || "";
-    } catch {
-      return "";
-    }
-  });
+  const [authToken, setAuthToken] = useState("");
   const [authUser, setAuthUser] = useState<RegisteredUser | null>(null);
   const [authPending, setAuthPending] = useState(false);
-  const [authLoading, setAuthLoading] = useState(Boolean(authToken));
+  const [authLoading, setAuthLoading] = useState(true);
   const [authError, setAuthError] = useState("");
 
   const inputRef = useRef<HTMLInputElement>(null);
@@ -224,34 +219,19 @@ function App() {
   }, [selectedColor, colorStorageKey]);
 
   useEffect(() => {
-    try {
-      if (authToken) {
-        localStorage.setItem(authStorageKey, authToken);
-      } else {
-        localStorage.removeItem(authStorageKey);
-      }
-    } catch {}
-  }, [authStorageKey, authToken]);
-
-  useEffect(() => {
     if (!authUser) {
       setRegisterNickname(name);
     }
   }, [authUser, name]);
 
   useEffect(() => {
-    if (!authToken) {
-      setAuthLoading(false);
-      setAuthUser(null);
-      return;
-    }
-
     let cancelled = false;
     setAuthLoading(true);
 
-    void apiRequest<MeResponse>("/api/auth/me", { token: authToken })
+    void apiRequest<MeResponse>("/api/auth/me")
       .then((data) => {
         if (cancelled) return;
+        setAuthToken(data.token);
         setAuthUser(data.user);
         setName(data.user.nickname);
         setTempName(data.user.nickname);
@@ -271,7 +251,7 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [authToken]);
+  }, []);
 
   const socket = usePartySocket({
     party: "chat",
