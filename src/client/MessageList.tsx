@@ -4,8 +4,12 @@ import type { ChatMessage } from "../shared";
 interface MessageListProps {
   messages: ChatMessage[];
   name: string;
+  currentUserId?: string;
   onTagUser: (userName: string) => void;
-  onDeleteMessage: (messageId: string, messageUser: string) => void;
+  onDeleteMessage: (message: ChatMessage) => void;
+  onBanUser: (message: ChatMessage) => void;
+  canDeleteMessage: (message: ChatMessage) => boolean;
+  canBanUser: (message: ChatMessage) => boolean;
   isDarkColor: (color: string) => boolean;
   renderContent: (content: string, messageType?: string) => React.ReactNode;
   messagesContainerRef: React.RefObject<HTMLDivElement>;
@@ -17,8 +21,12 @@ interface MessageListProps {
 export const MessageList: React.FC<MessageListProps> = ({
   messages,
   name,
+  currentUserId,
   onTagUser,
   onDeleteMessage,
+  onBanUser,
+  canDeleteMessage,
+  canBanUser,
   isDarkColor,
   renderContent,
   messagesContainerRef,
@@ -26,11 +34,10 @@ export const MessageList: React.FC<MessageListProps> = ({
   onQuoteMessage,
   onLongPressIgnore,
 }) => {
-  // Use a ref to track swipe start X per message
   const touchStartXRef = React.useRef<{ [id: string]: number }>({});
-  // Long-press logic for ignore
-  // Use number for browser setTimeout
-  const longPressTimeout = React.useRef<{ [id: string]: number }>({});
+  const longPressTimeout = React.useRef<{
+    [id: string]: ReturnType<typeof setTimeout>;
+  }>({});
   const [ignorePrompt, setIgnorePrompt] = React.useState<{
     user: string;
     x: number;
@@ -111,6 +118,18 @@ export const MessageList: React.FC<MessageListProps> = ({
             {message.taggedUser && (
               <span className="tag-badge">@{message.taggedUser}</span>
             )}
+            {message.authorRole === "admin" && (
+              <span className="role-badge">Admin</span>
+            )}
+            {message.isRegistered && message.authorRole === "member" && (
+              <span className="role-badge member-badge">Member</span>
+            )}
+            {message.isRegistered && message.authorId === currentUserId && (
+              <span className="role-badge">You</span>
+            )}
+            {!message.isRegistered && message.role === "user" && (
+              <span className="role-badge guest-badge">Guest</span>
+            )}
             <span className="message-date">
               {new Date(message.timestamp).toLocaleDateString()}{" "}
               {new Date(message.timestamp).toLocaleTimeString([], {
@@ -119,22 +138,23 @@ export const MessageList: React.FC<MessageListProps> = ({
               })}
             </span>
           </div>
-          {/* Parse and show quote if present in content */}
+
           {message.content.startsWith("::quote::") &&
             (() => {
               const endIdx = message.content.indexOf("::endquote::");
-              if (endIdx !== -1) {
-                const quoted = message.content.substring(8, endIdx);
-                return (
-                  <div className="quote-balloon message-quote-balloon">
-                    <span className="quote-content">
-                      {quoted.length > 60 ? quoted.slice(0, 60) + "…" : quoted}
-                    </span>
-                  </div>
-                );
+              if (endIdx === -1) {
+                return null;
               }
-              return null;
+              const quoted = message.content.substring(8, endIdx);
+              return (
+                <div className="quote-balloon message-quote-balloon">
+                  <span className="quote-content">
+                    {quoted.length > 60 ? `${quoted.slice(0, 60)}...` : quoted}
+                  </span>
+                </div>
+              );
             })()}
+
           <div className="message-bottom-row">
             <span
               className="message-content"
@@ -148,34 +168,51 @@ export const MessageList: React.FC<MessageListProps> = ({
                     contentToShow = contentToShow.slice(endIdx + 12).trim();
                   }
                 }
-                // Do not shorten AI bot messages
+
                 const isBot =
                   message.user === "AI" || message.role === "assistant";
+
                 return message.messageType === "text"
                   ? renderContent(
                       isBot
                         ? contentToShow
                         : contentToShow.length > 200
-                          ? contentToShow.slice(0, 200) + "…"
+                          ? `${contentToShow.slice(0, 200)}...`
                           : contentToShow,
                       message.messageType,
                     )
                   : renderContent(contentToShow, message.messageType);
               })()}
             </span>
-            {message.user === name && (
-              <button
-                className="delete-button compact-delete"
-                onClick={() => onDeleteMessage(message.id, message.user)}
-                title="Delete message"
-              >
-                🗑️
-              </button>
+
+            {(canDeleteMessage(message) || canBanUser(message)) && (
+              <div className="message-actions">
+                {canBanUser(message) && (
+                  <button
+                    className="delete-button compact-delete ban-button"
+                    onClick={() => onBanUser(message)}
+                    title="Ban user"
+                  >
+                    Ban
+                  </button>
+                )}
+                {canDeleteMessage(message) && (
+                  <button
+                    className="delete-button compact-delete"
+                    onClick={() => onDeleteMessage(message)}
+                    title="Delete message"
+                  >
+                    Delete
+                  </button>
+                )}
+              </div>
             )}
           </div>
         </div>
       ))}
+
       <div ref={messagesEndRef} />
+
       {ignorePrompt && (
         <div
           className="ignore-prompt"

@@ -9,7 +9,7 @@ interface NicknameEditProps {
   colors: string[];
   onSetEditingName: (editing: boolean) => void;
   onSetTempName: (name: string) => void;
-  onSetName: (name: string) => void;
+  onSaveName: (name: string) => boolean | Promise<boolean>;
   onSetSelectedColor: (color: string) => void;
   onSetShowColorPicker: (show: boolean) => void;
 }
@@ -23,19 +23,24 @@ export const NicknameEdit: React.FC<NicknameEditProps> = ({
   colors,
   onSetEditingName,
   onSetTempName,
-  onSetName,
+  onSaveName,
   onSetSelectedColor,
   onSetShowColorPicker,
 }) => {
   return (
     <div className="nickname-edit">
+      <div className="menu-section-title">Profile settings</div>
       {editingName ? (
         <form
-          onSubmit={(e) => {
+          className="nickname-form"
+          onSubmit={async (e) => {
             e.preventDefault();
             const newName = tempName.trim();
-            if (newName.length > 0) onSetName(newName);
-            onSetEditingName(false);
+            if (newName.length === 0) return;
+            const saved = await onSaveName(newName);
+            if (saved) {
+              onSetEditingName(false);
+            }
           }}
         >
           <input
@@ -43,21 +48,28 @@ export const NicknameEdit: React.FC<NicknameEditProps> = ({
             onChange={(e) => onSetTempName(e.currentTarget.value)}
             className="my-input-text"
             autoComplete="off"
+            placeholder="Your nickname"
           />
-          <button type="submit">Save</button>
-          <button
-            type="button"
-            onClick={() => {
-              onSetEditingName(false);
-              onSetTempName(name);
-            }}
-          >
-            Cancel
-          </button>
+          <div className="nickname-actions">
+            <button type="submit" className="menu-action-button primary">
+              Save
+            </button>
+            <button
+              type="button"
+              className="menu-action-button"
+              onClick={() => {
+                onSetEditingName(false);
+                onSetTempName(name);
+              }}
+            >
+              Cancel
+            </button>
+          </div>
         </form>
       ) : (
-        <>
+        <div className="nickname-controls">
           <button
+            className="menu-action-button"
             onClick={() => {
               onSetTempName(name);
               onSetEditingName(true);
@@ -66,6 +78,7 @@ export const NicknameEdit: React.FC<NicknameEditProps> = ({
             Edit Nickname
           </button>
           <button
+            className="menu-action-button color-toggle-button"
             onClick={() => onSetShowColorPicker(!showColorPicker)}
             style={{
               backgroundColor: selectedColor,
@@ -89,7 +102,7 @@ export const NicknameEdit: React.FC<NicknameEditProps> = ({
               ))}
             </div>
           )}
-        </>
+        </div>
       )}
     </div>
   );

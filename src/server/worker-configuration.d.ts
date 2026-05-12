@@ -14,6 +14,9 @@ declare namespace Cloudflare {
     SUPABASE_URL?: string;
     SUPABASE_ANON_KEY?: string;
     SUPABASE_SERVICE_ROLE_KEY?: string;
+    ADMIN_EMAILS?: string;
+    ENABLE_UNREGISTERED?: string;
+    AI_API_TOKEN?: string;
   }
 }
 interface Env extends Cloudflare.Env {}

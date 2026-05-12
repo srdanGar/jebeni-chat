@@ -7,6 +7,7 @@ declare global {
       SUPABASE_URL?: string;
       SUPABASE_ANON_KEY?: string;
       SUPABASE_KEY?: string;
+      ENABLE_UNREGISTERED?: string;
     };
   }
 }
@@ -17,16 +18,23 @@ declare global {
 // Prefer build-time `import.meta.env`, then check runtime-injected `window.ENV` (Worker injects when serving index.html),
 // then legacy `globalThis.__ENV` (older code), then VITE_* fallbacks.
 
+const runtimeWindow =
+  typeof globalThis !== "undefined"
+    ? ((globalThis as { window?: Window }).window ?? undefined)
+    : undefined;
+
 const isBrowser =
-  typeof window !== "undefined" && typeof window.ENV !== "undefined";
+  typeof runtimeWindow !== "undefined" &&
+  typeof runtimeWindow.ENV !== "undefined";
 
 let supabaseUrl: string;
 let supabaseKey: string;
 
 if (isBrowser) {
   console.log("Running in browser, using window.ENV for Supabase config.");
-  supabaseUrl = window.ENV!.SUPABASE_URL!;
-  supabaseKey = window.ENV!.SUPABASE_ANON_KEY || window.ENV!.SUPABASE_KEY!;
+  supabaseUrl = runtimeWindow!.ENV!.SUPABASE_URL!;
+  supabaseKey =
+    runtimeWindow!.ENV!.SUPABASE_ANON_KEY || runtimeWindow!.ENV!.SUPABASE_KEY!;
   if (!supabaseUrl || !supabaseKey) {
     throw new Error(
       "Supabase config missing: window.ENV.SUPABASE_URL or window.ENV.SUPABASE_ANON_KEY is not set.",

@@ -1,6 +1,6 @@
 import React from "react";
 import { nanoid } from "nanoid";
-import type { ChatMessage, Message } from "../shared";
+import type { ChatMessage } from "../shared";
 
 interface InputFormProps {
   inputRef: React.RefObject<HTMLInputElement>;
@@ -9,6 +9,10 @@ interface InputFormProps {
   taggedUser: string;
   isRecording: boolean;
   selectedColor: string;
+  canSend: boolean;
+  canUseAudio: boolean;
+  canUseImage: boolean;
+  helperText?: string;
   onSubmit: (message: ChatMessage) => void;
   onClearTag: () => void;
   onMicClick: () => void;
@@ -24,6 +28,10 @@ export const InputForm: React.FC<InputFormProps> = ({
   taggedUser,
   isRecording,
   selectedColor,
+  canSend,
+  canUseAudio,
+  canUseImage,
+  helperText,
   onSubmit,
   onClearTag,
   onMicClick,
@@ -36,6 +44,7 @@ export const InputForm: React.FC<InputFormProps> = ({
       className="form-row"
       onSubmit={(e) => {
         e.preventDefault();
+        if (!canSend) return;
         const content = inputRef.current;
         if (!content || content.value.trim() === "") return;
 
@@ -83,6 +92,7 @@ export const InputForm: React.FC<InputFormProps> = ({
           className="input-field"
           placeholder={`Hello ${name}! Type a message...`}
           autoComplete="off"
+          disabled={!canSend}
           style={{
             paddingLeft: taggedUser ? "80px" : "10px",
           }}
@@ -99,16 +109,18 @@ export const InputForm: React.FC<InputFormProps> = ({
             </button>
           </span>
         )}
-        <button type="submit" className="send-message">
+        <button type="submit" className="send-message" disabled={!canSend}>
           Send
         </button>
       </div>
+      {helperText && <div className="input-helper-text">{helperText}</div>}
       <div className="button-row">
         <button
           type="button"
           onClick={onMicClick}
           className="mic-button"
           title={isRecording ? "Stop recording" : "Record voice message"}
+          disabled={!canUseAudio}
           style={{
             backgroundColor: isRecording ? "red" : undefined,
           }}
@@ -120,6 +132,7 @@ export const InputForm: React.FC<InputFormProps> = ({
           onClick={() => fileInputRef.current?.click()}
           className="image-button"
           title="Upload image"
+          disabled={!canUseImage}
         >
           ➕
         </button>
