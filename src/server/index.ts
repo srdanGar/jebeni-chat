@@ -273,14 +273,28 @@ async function handleDeleteOld(request: Request, env: Env) {
 
   const id = env.Chat.idFromName(DEFAULT_ROOM);
   const chatStub = env.Chat.get(id);
-  return chatStub.fetch(new Request(`http://internal/deleteOld?hours=${hours}`));
+  return chatStub.fetch(createInternalChatRequest(`/deleteOld?hours=${hours}`));
+}
+
+function createInternalChatRequest(path: string, request?: Request) {
+  const headers = new Headers(request?.headers);
+  headers.set("x-partykit-room", DEFAULT_ROOM);
+  headers.set("x-partykit-namespace", "chat");
+
+  return new Request(`http://internal${path}`, {
+    method: request?.method,
+    headers,
+    body: request?.body,
+  });
 }
 
 async function forwardToChat(request: Request, env: Env) {
   const url = new URL(request.url);
   const id = env.Chat.idFromName(DEFAULT_ROOM);
   const chatStub = env.Chat.get(id);
-  return chatStub.fetch(new Request(`http://internal${url.pathname}${url.search}`, request));
+  return chatStub.fetch(
+    createInternalChatRequest(`${url.pathname}${url.search}`, request),
+  );
 }
 
 export class Chat extends Server<Env> {
