@@ -30,7 +30,9 @@ const IGNORE_KEY = "chat:ignoreList";
 const runtimeEnv =
   typeof window !== "undefined" && window.ENV ? window.ENV : {};
 const ENABLE_UNREGISTERED = !["0", "false", "no", "off"].includes(
-  String(runtimeEnv.ENABLE_UNREGISTERED || "true").trim().toLowerCase(),
+  String(runtimeEnv.ENABLE_UNREGISTERED || "true")
+    .trim()
+    .toLowerCase(),
 );
 
 type AuthMode = "login" | "register";
@@ -99,7 +101,9 @@ async function apiRequest<T>(
   return data;
 }
 
-function toChatMessage(message: Extract<Message, { type: "add" | "update" }>): ChatMessage {
+function toChatMessage(
+  message: Extract<Message, { type: "add" | "update" }>,
+): ChatMessage {
   return {
     id: message.id,
     content: message.content,
@@ -160,12 +164,8 @@ function App() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
 
-  const {
-    isRecording,
-    setIsRecording,
-    mediaRecorder,
-    setMediaRecorder,
-  } = useAudioRecording();
+  const { isRecording, setIsRecording, mediaRecorder, setMediaRecorder } =
+    useAudioRecording();
 
   const messagesEndRef = useAutoScroll({
     messages,
@@ -301,6 +301,15 @@ function App() {
         return;
       }
 
+      if (message.type === "unbanned") {
+        if (authUser?.id === message.userId) {
+          alert(
+            "Your account has been unbanned. You can continue using the chat.",
+          );
+        }
+        return;
+      }
+
       if (message.type === "error") {
         alert(message.message);
       }
@@ -335,6 +344,16 @@ function App() {
     });
   };
 
+  const handleUnbanUser = (message: ChatMessage) => {
+    if (!message.authorId) return;
+    if (!confirm(`Unban ${message.user}?`)) return;
+    sendSocketMessage({
+      type: "unban",
+      targetUserId: message.authorId,
+      authToken: authToken || undefined,
+    });
+  };
+
   const canDeleteMessage = (message: ChatMessage) => {
     if (!authUser) return false;
     if (isAdmin) return true;
@@ -342,6 +361,14 @@ function App() {
   };
 
   const canBanUser = (message: ChatMessage) => {
+    if (!isAdmin || !authUser) return false;
+    if (!message.isRegistered || !message.authorId) return false;
+    if (message.authorId === authUser.id) return false;
+    if (message.authorRole === "admin") return false;
+    return message.role === "user";
+  };
+
+  const canUnbanUser = (message: ChatMessage) => {
     if (!isAdmin || !authUser) return false;
     if (!message.isRegistered || !message.authorId) return false;
     if (message.authorId === authUser.id) return false;
@@ -575,7 +602,9 @@ function App() {
         setRegisterNickname(nextName);
         return true;
       } catch (error) {
-        alert(error instanceof Error ? error.message : "Username is not available.");
+        alert(
+          error instanceof Error ? error.message : "Username is not available.",
+        );
         return false;
       }
     }
@@ -591,7 +620,9 @@ function App() {
       setTempName(data.user.nickname);
       return true;
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to update profile.");
+      alert(
+        error instanceof Error ? error.message : "Failed to update profile.",
+      );
       return false;
     }
   };
@@ -612,8 +643,10 @@ function App() {
           onTagUser={handleTagUser}
           onDeleteMessage={handleDeleteMessage}
           onBanUser={handleBanUser}
+          onUnbanUser={handleUnbanUser}
           canDeleteMessage={canDeleteMessage}
           canBanUser={canBanUser}
+          canUnbanUser={canUnbanUser}
           isDarkColor={isDarkColor}
           renderContent={renderContent}
           messagesContainerRef={messagesContainerRef}
@@ -653,7 +686,10 @@ function App() {
           <div className="app-menu-popup">
             <div className="app-menu-header">
               <h4>Menu</h4>
-              <button className="close-button" onClick={() => setShowMenu(false)}>
+              <button
+                className="close-button"
+                onClick={() => setShowMenu(false)}
+              >
                 x
               </button>
             </div>
@@ -710,10 +746,15 @@ function App() {
                     <div className="auth-detail-row">
                       <span>Status</span>
                       <strong>
-                        {authUser.role === "admin" ? "Administrator" : "Registered"}
+                        {authUser.role === "admin"
+                          ? "Administrator"
+                          : "Registered"}
                       </strong>
                     </div>
-                    <button className="menu-action-button" onClick={handleLogout}>
+                    <button
+                      className="menu-action-button"
+                      onClick={handleLogout}
+                    >
                       Log out
                     </button>
                   </div>
@@ -740,7 +781,9 @@ function App() {
                         <input
                           className="my-input-text"
                           value={registerNickname}
-                          onChange={(event) => setRegisterNickname(event.currentTarget.value)}
+                          onChange={(event) =>
+                            setRegisterNickname(event.currentTarget.value)
+                          }
                           placeholder="Nickname"
                           autoComplete="nickname"
                         />
@@ -749,7 +792,9 @@ function App() {
                         className="my-input-text"
                         type="email"
                         value={authEmail}
-                        onChange={(event) => setAuthEmail(event.currentTarget.value)}
+                        onChange={(event) =>
+                          setAuthEmail(event.currentTarget.value)
+                        }
                         placeholder="Email"
                         autoComplete="email"
                       />
@@ -757,13 +802,19 @@ function App() {
                         className="my-input-text"
                         type="password"
                         value={authPassword}
-                        onChange={(event) => setAuthPassword(event.currentTarget.value)}
+                        onChange={(event) =>
+                          setAuthPassword(event.currentTarget.value)
+                        }
                         placeholder="Password"
                         autoComplete={
-                          authMode === "login" ? "current-password" : "new-password"
+                          authMode === "login"
+                            ? "current-password"
+                            : "new-password"
                         }
                       />
-                      {authError && <div className="auth-error">{authError}</div>}
+                      {authError && (
+                        <div className="auth-error">{authError}</div>
+                      )}
                       <button
                         className="menu-action-button primary"
                         type="submit"

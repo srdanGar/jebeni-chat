@@ -63,6 +63,10 @@ export type Message =
       type: "ban";
       targetUserId: string;
     } & MessageWithAuth)
+  | ({
+      type: "unban";
+      targetUserId: string;
+    } & MessageWithAuth)
   | {
       type: "all";
       messages: ChatMessage[];
@@ -74,6 +78,10 @@ export type Message =
     }
   | {
       type: "banned";
+      userId: string;
+    }
+  | {
+      type: "unbanned";
       userId: string;
     };
 

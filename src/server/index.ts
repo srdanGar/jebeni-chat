@@ -413,7 +413,8 @@ export class Chat extends Server<Env> {
         (row.messageType as "text" | "audio" | "image" | undefined) || "text",
       taggedUser: row.taggedUser ? String(row.taggedUser) : undefined,
       authorId: row.authorId ? String(row.authorId) : undefined,
-      authorRole: (row.authorRole as ChatParticipantRole | undefined) || "guest",
+      authorRole:
+        (row.authorRole as ChatParticipantRole | undefined) || "guest",
       isRegistered:
         row.isRegistered === 1 ||
         row.isRegistered === "1" ||
@@ -430,7 +431,9 @@ export class Chat extends Server<Env> {
     if (headerToken) {
       return headerToken;
     }
-    return parseCookies(request.headers.get("Cookie")).get(SESSION_COOKIE_NAME) || "";
+    return (
+      parseCookies(request.headers.get("Cookie")).get(SESSION_COOKIE_NAME) || ""
+    );
   }
 
   private getSupabaseAdminClient() {
@@ -595,11 +598,14 @@ export class Chat extends Server<Env> {
   }
 
   private getConnectionIdentity(connection: Connection) {
-    return (((connection as unknown as { state?: ConnectionIdentityState }).state ||
-      null) as ConnectionIdentityState | null);
+    return ((connection as unknown as { state?: ConnectionIdentityState })
+      .state || null) as ConnectionIdentityState | null;
   }
 
-  private setConnectionIdentity(connection: Connection, identity: ConnectionIdentityState) {
+  private setConnectionIdentity(
+    connection: Connection,
+    identity: ConnectionIdentityState,
+  ) {
     const statefulConnection = connection as unknown as {
       setState?: (state: ConnectionIdentityState) => void;
     };
@@ -618,7 +624,10 @@ export class Chat extends Server<Env> {
     const nicknameKey = getNicknameKey(normalizedNickname);
 
     const existingUser = this.getUserByNickname(normalizedNickname);
-    if (existingUser && (!options.userId || existingUser.id !== options.userId)) {
+    if (
+      existingUser &&
+      (!options.userId || existingUser.id !== options.userId)
+    ) {
       return "That username is already taken.";
     }
 
@@ -767,10 +776,7 @@ export class Chat extends Server<Env> {
       );
     }
     if (this.getUserByEmail(email)) {
-      return jsonResponse(
-        { error: "That email is already registered." },
-        409,
-      );
+      return jsonResponse({ error: "That email is already registered." }, 409);
     }
     const nicknameConflict = this.getNicknameConflict(nickname, {
       isRegistered: true,
@@ -810,7 +816,9 @@ export class Chat extends Server<Env> {
   }
 
   private async handleLogin(request: Request) {
-    const body = await this.readJson<{ email?: string; password?: string }>(request);
+    const body = await this.readJson<{ email?: string; password?: string }>(
+      request,
+    );
     const email = normalizeEmail(body.email || "");
     const password = body.password || "";
     const user = this.getUserByEmail(email);
@@ -820,10 +828,13 @@ export class Chat extends Server<Env> {
     }
 
     if (!hasPasswordCredentials(user)) {
-      console.error("Login failed: user record is missing password credentials", {
-        email,
-        userId: user.id,
-      });
+      console.error(
+        "Login failed: user record is missing password credentials",
+        {
+          email,
+          userId: user.id,
+        },
+      );
       return jsonResponse(
         {
           error:
@@ -851,22 +862,18 @@ export class Chat extends Server<Env> {
     if (token) {
       this.deleteSession(token);
     }
-    return jsonResponseWithHeaders(
-      { ok: true },
-      200,
-      { "Set-Cookie": buildExpiredSessionCookie(request) },
-    );
+    return jsonResponseWithHeaders({ ok: true }, 200, {
+      "Set-Cookie": buildExpiredSessionCookie(request),
+    });
   }
 
   private async handleMe(request: Request) {
     const token = this.getAuthTokenFromRequest(request);
     const sessionState = await this.requireSession(token);
     if (!sessionState) {
-      return jsonResponseWithHeaders(
-        { error: "Not authenticated." },
-        401,
-        { "Set-Cookie": buildExpiredSessionCookie(request) },
-      );
+      return jsonResponseWithHeaders({ error: "Not authenticated." }, 401, {
+        "Set-Cookie": buildExpiredSessionCookie(request),
+      });
     }
     if (sessionState.user.bannedAt) {
       this.deleteSession(token);
@@ -962,10 +969,15 @@ export class Chat extends Server<Env> {
         actor.role === "admin" ||
         (actor.isRegistered &&
           actor.userId &&
-          (existing.authorId === actor.userId || existing.user === actor.nickname));
+          (existing.authorId === actor.userId ||
+            existing.user === actor.nickname));
 
       if (!canDelete) {
-        this.sendError(connection, "forbidden", "You cannot delete that message.");
+        this.sendError(
+          connection,
+          "forbidden",
+          "You cannot delete that message.",
+        );
         return;
       }
 
@@ -988,11 +1000,19 @@ export class Chat extends Server<Env> {
         return;
       }
       if (target.id === actor.userId) {
-        this.sendError(connection, "invalid_target", "You cannot ban yourself.");
+        this.sendError(
+          connection,
+          "invalid_target",
+          "You cannot ban yourself.",
+        );
         return;
       }
       if (target.role === "admin") {
-        this.sendError(connection, "invalid_target", "You cannot ban another admin.");
+        this.sendError(
+          connection,
+          "invalid_target",
+          "You cannot ban another admin.",
+        );
         return;
       }
 
@@ -1008,6 +1028,50 @@ export class Chat extends Server<Env> {
       return;
     }
 
+    if (parsed.type === "unban") {
+      const actor = await this.resolveActor(parsed.authToken, "");
+      if (actor.role !== "admin" || !actor.userId) {
+        this.sendError(connection, "forbidden", "Only admins can unban users.");
+        return;
+      }
+
+      const target = this.getUserById(parsed.targetUserId);
+      if (!target) {
+        this.sendError(connection, "not_found", "User not found.");
+        return;
+      }
+      if (target.id === actor.userId) {
+        this.sendError(
+          connection,
+          "invalid_target",
+          "You cannot unban yourself.",
+        );
+        return;
+      }
+      if (target.role === "admin") {
+        this.sendError(
+          connection,
+          "invalid_target",
+          "You cannot unban an admin.",
+        );
+        return;
+      }
+      if (!target.bannedAt) {
+        this.sendError(connection, "invalid_target", "User is not banned.");
+        return;
+      }
+
+      const unbannedAt = new Date().toISOString();
+      this.ctx.storage.sql.exec(
+        `UPDATE users
+         SET bannedAt = NULL,
+             updatedAt = '${esc(unbannedAt)}'
+         WHERE id = '${esc(target.id)}'`,
+      );
+      this.broadcast(JSON.stringify({ type: "unbanned", userId: target.id }));
+      return;
+    }
+
     if (parsed.type !== "add" && parsed.type !== "update") {
       return;
     }
@@ -1016,7 +1080,9 @@ export class Chat extends Server<Env> {
     if (actor.bannedAt) {
       if (actor.userId) {
         this.deleteAllSessionsForUser(actor.userId);
-        connection.send(JSON.stringify({ type: "banned", userId: actor.userId }));
+        connection.send(
+          JSON.stringify({ type: "banned", userId: actor.userId }),
+        );
       }
       return;
     }
@@ -1059,7 +1125,11 @@ export class Chat extends Server<Env> {
         actor.userId &&
         (actor.role === "admin" || existing.authorId === actor.userId);
       if (!canUpdate) {
-        this.sendError(connection, "forbidden", "You cannot edit that message.");
+        this.sendError(
+          connection,
+          "forbidden",
+          "You cannot edit that message.",
+        );
         return;
       }
     }
@@ -1146,7 +1216,9 @@ export class Chat extends Server<Env> {
         };
 
         this.saveMessage(botMessage);
-        this.broadcast(JSON.stringify({ type: "add", ...botMessage } satisfies Message));
+        this.broadcast(
+          JSON.stringify({ type: "add", ...botMessage } satisfies Message),
+        );
       } catch (error) {
         console.error("AI error:", error);
       }

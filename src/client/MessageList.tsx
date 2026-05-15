@@ -8,8 +8,10 @@ interface MessageListProps {
   onTagUser: (userName: string) => void;
   onDeleteMessage: (message: ChatMessage) => void;
   onBanUser: (message: ChatMessage) => void;
+  onUnbanUser: (message: ChatMessage) => void;
   canDeleteMessage: (message: ChatMessage) => boolean;
   canBanUser: (message: ChatMessage) => boolean;
+  canUnbanUser: (message: ChatMessage) => boolean;
   isDarkColor: (color: string) => boolean;
   renderContent: (content: string, messageType?: string) => React.ReactNode;
   messagesContainerRef: React.RefObject<HTMLDivElement>;
@@ -25,8 +27,10 @@ export const MessageList: React.FC<MessageListProps> = ({
   onTagUser,
   onDeleteMessage,
   onBanUser,
+  onUnbanUser,
   canDeleteMessage,
   canBanUser,
+  canUnbanUser,
   isDarkColor,
   renderContent,
   messagesContainerRef,
@@ -185,7 +189,9 @@ export const MessageList: React.FC<MessageListProps> = ({
               })()}
             </span>
 
-            {(canDeleteMessage(message) || canBanUser(message)) && (
+            {(canDeleteMessage(message) ||
+              canBanUser(message) ||
+              canUnbanUser(message)) && (
               <div className="message-actions">
                 {canBanUser(message) && (
                   <button
@@ -194,6 +200,15 @@ export const MessageList: React.FC<MessageListProps> = ({
                     title="Ban user"
                   >
                     Ban
+                  </button>
+                )}
+                {canUnbanUser(message) && (
+                  <button
+                    className="delete-button compact-delete"
+                    onClick={() => onUnbanUser(message)}
+                    title="Unban user"
+                  >
+                    Unban
                   </button>
                 )}
                 {canDeleteMessage(message) && (
