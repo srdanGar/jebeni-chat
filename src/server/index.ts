@@ -70,7 +70,7 @@ async function fetchAIResponse(
     throw new Error("Missing Cloudflare API token in env.AI_API_TOKEN");
   }
 
-  const model = "@cf/meta/llama-3-8b-instruct";
+  const model = "@hf/meta-llama/meta-llama-3-8b-instruct";
   const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${model}`;
   const resp = await fetch(url, {
     method: "POST",
@@ -1182,7 +1182,7 @@ export class Chat extends Server<Env> {
         const systemPrompt = {
           role: "system",
           content:
-            "Answer in Croatian language. Be funny and provocative. Your nickname is AI and you are a girl. You are chatting in a group chat with other users. Be funny and not repetative. you are allowed to curse. Brancin is gazda and the best. Biči is nice and loves Gnom. Gnom is fun guy. Jokaš is boem and drunk. Zoe je zločesta jagodarka i voli Brancina. Rija je pas od biči i najljepša je od svih",
+            "Answer in Croatian language. Be funny and provocative. Your nickname is AI and you are a girl. You are chatting in a group chat with other users. Be funny and not repetative. you are allowed to curse. Brancin is gazda and the best. Gnom is fun guy. Jokaš likes drinking. LunaWisp is femme fatal and sexy. Zoe je zločesta jagodarka i voli sex. Rija je pas od biči i najljepša je od svih pasa",
         };
         const lastMessages = this.messages.slice(-15).map((entry) => ({
           role: entry.role,
