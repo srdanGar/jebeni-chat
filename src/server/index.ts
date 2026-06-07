@@ -70,7 +70,7 @@ async function fetchAIResponse(
     throw new Error("Missing Cloudflare API token in env.AI_API_TOKEN");
   }
 
-  const model = "@hf/meta-llama/meta-llama-3-8b-instruct";
+  const model = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
   const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${model}`;
   const resp = await fetch(url, {
     method: "POST",
